@@ -1,0 +1,5660 @@
+
+Enterprise AWS Disaster Recovery Operations Manual
+
+Part 1
+Introduction
+Architecture
+Recovery Strategy
+Roles & Responsibilities
+DR Readiness Validation
+
+Part 2
+Domain Controller Recovery & Validation
+DNS Validation
+FSx Recovery & Validation
+
+Part 3
+Database Recovery Foundations
+Application Recovery
+Web Recovery
+Network Validation
+
+Part 4
+Active Directory Connectivity Validation
+Systems Manager Validation
+Windows Domain Integration
+Linux Domain Integration
+Trust Validation
+
+Part 5
+DR WorkSpace Bubble Validation
+Target Groups
+ALB
+NLB
+Route53
+
+Part 6
+Application Validation
+Business Validation
+Evidence Collection
+
+Part 7
+Failure Handling
+Troubleshooting Playbooks
+Acceptance Criteria
+Sign-Off
+Lessons Learned
+
+Part 8
+AOAG Recovery
+Database Validation
+Environment-Specific Appendices
+
+
+Enterprise AWS Disaster Recovery Operations Manual
+Part 1 – Introduction, Architecture, Recovery Strategy, Roles & Responsibilities, and DR Readiness Validation
+ 
+⸻
+ 
+1. Purpose
+This document provides the operational procedures required to recover Production workloads into the Disaster Recovery (DR) environment hosted within Amazon Web Services (AWS).
+The runbook establishes a repeatable recovery process for infrastructure, storage, identity services, databases, applications, load balancers, and end-user access components.
+The goal is to ensure that recovered workloads can support business operations during a Disaster Recovery exercise or an actual Production outage.
+This document is intended to be used by:
+	•	Infrastructure Engineers
+	•	Cloud Engineers
+	•	Active Directory Administrators
+	•	Storage Administrators
+	•	Database Administrators
+	•	Application Support Teams
+	•	Disaster Recovery Coordinators
+	•	Business Validation Teams
+ 
+⸻
+ 
+2. Scope
+This runbook applies to systems hosted within:
+	•	AWS Production Account
+	•	AWS Disaster Recovery Account
+The procedures documented within this manual support:
+Disaster Recovery Exercises
+Controlled recovery events executed for validation and testing purposes.
+Planned Recovery Testing
+Recovery activities executed to validate recovery procedures and recovery time objectives.
+Actual Disaster Events
+Recovery activities executed when Production services become unavailable and business services must be restored within the Disaster Recovery environment.
+ 
+⸻
+ 
+3. Environment Overview
+Production Environment
+The Production environment contains the following core services.
+Identity Services
+	•	Active Directory Domain Controllers
+	•	DNS Services
+	•	Authentication Services
+	•	Group Policy Services
+Storage Services
+	•	Amazon FSx for Windows File Server
+	•	SMB File Shares
+	•	Application Storage
+Database Services
+	•	SQL Server Infrastructure
+	•	Database Clusters
+	•	Application Databases
+Application Services
+	•	Middleware
+	•	API Services
+	•	Application Servers
+Presentation Services
+	•	Web Servers
+	•	Application Load Balancers
+	•	Network Load Balancers
+User Access Services
+	•	Route53 DNS
+	•	Corporate Access
+	•	Business Applications
+ 
+⸻
+ 
+Disaster Recovery Environment
+The Disaster Recovery environment contains:
+Identity Services
+	•	Replicated Domain Controllers
+	•	Replicated DNS Services
+Storage Services
+	•	Restored FSx Infrastructure
+Database Services
+	•	Recovered Database Servers
+Application Services
+	•	Recovered Application Servers
+Presentation Services
+	•	Recovered Web Servers
+	•	DR ALB
+	•	DR NLB
+User Access Services
+	•	DR WorkSpaces
+	•	Application Access Endpoints
+ 
+⸻
+ 
+4. Active Directory Design
+Domain Architecture
+The Production and Disaster Recovery environments utilize the same Active Directory domain.
+Example:
+corp.company.com
+The Domain Controllers used within the Disaster Recovery environment are replicated or recovered from Production and provide authentication services for recovered workloads.
+ 
+⸻
+ 
+Hostname Retention
+Recovered servers retain the hostname present at the time of replication.
+Example:
+Production
+APP01
+
+Recovered DR
+APP01
+This behavior is expected.
+Hostname retention is not considered a failure condition.
+ 
+⸻
+ 
+Important Clarification
+The purpose of the domain integration process is not to rename recovered servers.
+The purpose is to:
+	•	Validate Active Directory connectivity
+	•	Validate DNS functionality
+	•	Establish or repair trust relationships
+	•	Validate authentication services
+	•	Validate secure channel operations
+Authoritative validation methods include:
+Test-ComputerSecureChannel
+and
+nltest /dsgetdc:corp.company.com
+ 
+⸻
+ 
+5. Recovery Philosophy
+A common failure during Disaster Recovery exercises occurs when application recovery begins before foundational services have been validated.
+Examples include:
+	•	Domain Join Failures
+	•	Authentication Failures
+	•	DNS Failures
+	•	FSx Access Failures
+	•	Database Startup Failures
+	•	Application Startup Failures
+To avoid these conditions, all recovery activities must follow the approved dependency model.
+ 
+⸻
+ 
+6. Recovery Dependency Model
+Recovery activities must follow the sequence below.
+Domain Controllers
+        ↓
+DNS Services
+        ↓
+FSx
+        ↓
+Database Servers
+        ↓
+Application Servers
+        ↓
+Web Servers
+        ↓
+Target Groups
+        ↓
+Load Balancers
+        ↓
+Application Validation
+        ↓
+DR WorkSpace Validation
+        ↓
+Business Acceptance
+No phase may begin until the previous phase has been successfully completed.
+ 
+⸻
+ 
+7. Recovery Priority Matrix
+Priority	Component	Dependency
+1	Domain Controllers	None
+2	DNS Services	Domain Controllers
+3	FSx	DNS + AD
+4	Database Servers	DNS + AD + FSx
+5	Application Servers	Databases
+6	Web Servers	Applications
+7	Target Groups	Applications
+8	ALB / NLB	Target Groups
+9	DR WorkSpaces	Entire Stack
+ 
+⸻
+ 
+8. Roles and Responsibilities
+DR Lead
+Responsibilities:
+	•	Coordinate recovery activities
+	•	Manage communications
+	•	Authorize progression between phases
+	•	Obtain sign-off
+ 
+⸻
+ 
+Infrastructure Team
+Responsibilities:
+	•	Recover EC2 instances
+	•	Validate networking
+	•	Validate load balancers
+	•	Validate target groups
+ 
+⸻
+ 
+Active Directory Team
+Responsibilities:
+	•	Validate Domain Controllers
+	•	Validate DNS
+	•	Troubleshoot authentication issues
+	•	Support domain integration
+ 
+⸻
+ 
+Storage Team
+Responsibilities:
+	•	Validate FSx
+	•	Validate SMB access
+	•	Support storage troubleshooting
+ 
+⸻
+ 
+Database Team
+Responsibilities:
+	•	Recover databases
+	•	Validate connectivity
+	•	Validate replication
+ 
+⸻
+ 
+Application Team
+Responsibilities:
+	•	Validate applications
+	•	Validate middleware
+	•	Validate APIs
+ 
+⸻
+ 
+Business Validation Team
+Responsibilities:
+	•	Validate business workflows
+	•	Validate application functionality
+	•	Perform user acceptance testing
+ 
+⸻
+ 
+9. DR Readiness Validation
+Objective
+Validate that the Disaster Recovery environment is capable of supporting recovered workloads before recovery activities begin.
+This phase prevents infrastructure recovery from starting before foundational services are available.
+ 
+⸻
+ 
+Why This Matters
+Many failed Disaster Recovery exercises occur because infrastructure recovery begins before:
+	•	Active Directory is operational
+	•	DNS is operational
+	•	Systems Manager is operational
+	•	FSx is operational
+Validating these services before recovery significantly reduces troubleshooting effort later in the recovery process.
+ 
+⸻
+ 
+10. AWS Infrastructure Validation
+Objective
+Validate AWS services required to support recovery activities.
+ 
+⸻
+ 
+Validation Checklist
+Verify access to:
+	•	EC2
+	•	Systems Manager
+	•	FSx
+	•	Route53
+	•	Secrets Manager
+	•	Load Balancers
+	•	CloudWatch
+	•	IAM
+ 
+⸻
+ 
+Evidence Required
+Capture screenshots showing:
+	•	Successful console access
+	•	Account access
+	•	IAM access
+Store all evidence in the DR Exercise Repository.
+ 
+⸻
+ 
+11. Active Directory Readiness Validation
+Objective
+Validate that Domain Controllers are operational before workload recovery begins.
+ 
+⸻
+ 
+Execution Location
+Execute from:
+	•	DR Domain Controller
+	•	DR Management Server
+	•	Active Directory Administration Host
+Do not execute these validations from recovered application servers.
+ 
+⸻
+ 
+Validation Procedure
+nltest /dclist:corp.company.com
+ 
+⸻
+ 
+Expected Result
+List of Domain Controllers Returned
+ 
+⸻
+ 
+Evidence Required
+Capture:
+	•	Successful command output
+	•	Validation timestamp
+	•	Validation host
+ 
+⸻
+ 
+Common Failures
+No Domain Controllers Returned
+Potential Causes:
+	•	Domain Controllers offline
+	•	DNS failure
+	•	Active Directory service failure
+ 
+⸻
+ 
+Go / No-Go Decision
+Proceed only if Domain Controllers are discoverable.
+Otherwise:
+NO-GO
+Recovery activities stop until the issue is resolved.
+ 
+⸻
+ 
+12. DNS Readiness Validation
+Objective
+Validate DNS functionality before recovery activities begin.
+ 
+⸻
+ 
+Validation Procedure
+nslookup corp.company.com
+ 
+⸻
+ 
+Expected Result
+Successful Name Resolution
+ 
+⸻
+ 
+Evidence Required
+Capture:
+	•	Successful lookup results
+	•	Returned IP addresses
+ 
+⸻
+ 
+Common Failures
+Name Resolution Failure
+Potential Causes:
+	•	DNS service outage
+	•	Incorrect DNS configuration
+	•	Domain Controller outage
+ 
+⸻
+ 
+Go / No-Go Decision
+Proceed only if DNS resolution succeeds.
+ 
+⸻
+ 
+13. Systems Manager Readiness Validation
+Objective
+Validate Systems Manager functionality.
+Domain remediation activities later in the recovery process depend heavily upon Systems Manager.
+ 
+⸻
+ 
+Validation Areas
+Verify:
+	•	Fleet Manager available
+	•	Managed Instances visible
+	•	Run Command operational
+ 
+⸻
+ 
+Validation Procedure
+Execute:
+hostname
+using Run Command against a known managed instance.
+ 
+⸻
+ 
+Expected Result
+Command Success
+ 
+⸻
+ 
+Success Criteria
+Systems Manager is operational and capable of supporting recovery operations.
+ 
+⸻
+ 
+14. DR Readiness Approval
+The DR environment is considered ready only when:
+	•	Active Directory validated
+	•	DNS validated
+	•	Systems Manager validated
+	•	Required AWS services accessible
+ 
+⸻
+ 
+Final Go / No-Go Gate
+If any readiness validation fails:
+NO-GO
+Recovery activities must not begin.
+ 
+If all readiness validations succeed:
+GO
+Proceed to Part 2 – Domain Controller Recovery, DNS Validation, and FSx Recovery & Validation.
+
+Domain Controllers
+        ↓
+DNS
+        ↓
+FSx
+
+Enterprise AWS Disaster Recovery Operations Manual
+Part 2 – Domain Controller Recovery, DNS Validation, and FSx Recovery & Validation
+ 
+⸻
+ 
+15. Domain Controller Recovery and Validation
+Objective
+Validate that Disaster Recovery Domain Controllers are operational and capable of supporting authentication, DNS resolution, Group Policy processing, and Active Directory communications before any dependent workload recovery begins.
+Domain Controllers represent the foundational service upon which the remainder of the environment depends.
+No database, application, web server, or user validation should proceed until Domain Controller functionality has been confirmed.
+ 
+⸻
+ 
+Background
+The Disaster Recovery environment utilizes the same Active Directory domain as Production.
+Example:
+corp.company.com
+The Domain Controllers recovered into DR are responsible for:
+	•	User Authentication
+	•	Computer Authentication
+	•	Group Policy Processing
+	•	DNS Services
+	•	LDAP Queries
+	•	Kerberos Authentication
+	•	Domain Join Operations
+Failure of these services typically causes downstream failures across all application tiers.
+ 
+⸻
+ 
+Dependencies
+Before beginning Domain Controller validation, confirm:
+	•	DR Readiness Validation completed
+	•	AWS Console access available
+	•	Systems Manager operational
+	•	Required security groups available
+	•	Required subnets available
+ 
+⸻
+ 
+Validation Areas
+Active Directory Services
+Validate:
+	•	Domain Controller online
+	•	Active Directory services running
+	•	SYSVOL accessible
+	•	NETLOGON accessible
+ 
+⸻
+ 
+DNS Services
+Validate:
+	•	DNS service operational
+	•	Forward lookup zones operational
+	•	Reverse lookup zones operational
+ 
+⸻
+ 
+Replication Status
+Validate:
+	•	Active Directory replication healthy
+	•	No replication failures
+	•	No lingering replication errors
+ 
+⸻
+ 
+Domain Controller Discovery Validation
+Execute from a DR Domain Controller or DR Management Server.
+nltest /dclist:corp.company.com
+Expected Result:
+List of Domain Controllers Returned
+ 
+⸻
+ 
+Domain Controller Locator Validation
+nltest /dsgetdc:corp.company.com
+Expected Result:
+DC Found
+ 
+⸻
+ 
+DNS Validation
+nslookup corp.company.com
+Expected Result:
+Successful Name Resolution
+ 
+⸻
+ 
+Kerberos Validation
+Test-NetConnection <DC-IP> -Port 88
+Expected Result:
+TcpTestSucceeded : True
+ 
+⸻
+ 
+LDAP Validation
+Test-NetConnection <DC-IP> -Port 389
+Expected Result:
+TcpTestSucceeded : True
+ 
+⸻
+ 
+SMB Validation
+Test-NetConnection <DC-IP> -Port 445
+Expected Result:
+TcpTestSucceeded : True
+ 
+⸻
+ 
+Evidence Required
+Capture:
+	•	Domain Controller list
+	•	Domain Controller locator output
+	•	DNS validation output
+	•	Port validation output
+	•	Validation timestamp
+ 
+⸻
+ 
+Success Criteria
+Domain Controllers are:
+	•	Online
+	•	Discoverable
+	•	Responding to DNS
+	•	Responding to LDAP
+	•	Responding to Kerberos
+	•	Responding to SMB
+ 
+⸻
+ 
+Go / No-Go Decision
+Proceed only if all Domain Controller validations pass.
+If any validation fails:
+NO-GO
+Stop recovery activities and engage the Active Directory team.
+ 
+⸻
+ 
+16. DNS Validation and Health Verification
+Objective
+Validate DNS services required to support recovered workloads.
+DNS is one of the most common causes of recovery failures.
+Many domain join, FSx, application, and authentication failures are ultimately DNS-related.
+ 
+⸻
+ 
+Background
+Recovered systems depend heavily upon DNS to locate:
+	•	Domain Controllers
+	•	FSx File Systems
+	•	Databases
+	•	Application Endpoints
+	•	Load Balancers
+Failure to validate DNS before workload recovery often results in prolonged troubleshooting.
+ 
+⸻
+ 
+Dependencies
+Requires:
+	•	Domain Controllers validated
+	•	DNS service operational
+ 
+⸻
+ 
+Validate Domain Resolution
+nslookup corp.company.com
+Expected Result:
+Successful Resolution
+ 
+⸻
+ 
+Validate Domain Controller Records
+nslookup _ldap._tcp.dc._msdcs.corp.company.com
+Expected Result:
+SRV Records Returned
+ 
+⸻
+ 
+Validate Reverse Resolution
+nslookup <DC-IP>
+Expected Result:
+Hostname Returned
+ 
+⸻
+ 
+Validate DNS Port Connectivity
+Test-NetConnection <DC-IP> -Port 53
+Expected Result:
+TcpTestSucceeded : True
+ 
+⸻
+ 
+Validate DNS Configuration
+Windows:
+ipconfig /all
+Linux:
+cat /etc/resolv.conf
+Confirm:
+	•	Correct DNS Servers
+	•	Correct Search Suffix
+	•	Correct Domain
+ 
+⸻
+ 
+Evidence Required
+Capture:
+	•	nslookup output
+	•	SRV record lookup
+	•	Port validation output
+	•	DNS configuration
+ 
+⸻
+ 
+Success Criteria
+DNS successfully resolves:
+	•	Domain Controllers
+	•	Active Directory records
+	•	Internal infrastructure
+ 
+⸻
+ 
+Common Failures
+Domain Resolution Failure
+Potential Causes:
+	•	DNS service failure
+	•	Incorrect DNS configuration
+	•	Security Group restrictions
+ 
+⸻
+ 
+SRV Record Failure
+Potential Causes:
+	•	Active Directory registration failure
+	•	DNS replication failure
+ 
+⸻
+ 
+Go / No-Go Decision
+Proceed only if DNS validation succeeds.
+Otherwise:
+NO-GO
+ 
+⸻
+ 
+17. FSx Recovery and Validation
+Objective
+Validate that Amazon FSx for Windows File Server is available and capable of supporting recovered workloads.
+FSx frequently represents one of the most critical dependencies in the environment.
+Application recovery should not proceed until FSx functionality has been validated.
+ 
+⸻
+ 
+Background
+Applications often rely on FSx for:
+	•	Shared storage
+	•	Configuration files
+	•	Application binaries
+	•	User data
+	•	Service account access
+	•	SMB file shares
+A healthy EC2 server does not guarantee application functionality if FSx remains unavailable.
+ 
+⸻
+ 
+Dependencies
+Before validating FSx:
+	•	Domain Controllers validated
+	•	DNS validated
+	•	Network validation completed
+ 
+⸻
+ 
+Validate File System Availability
+Navigate:
+FSx
+→ File Systems
+Confirm:
+Status = Available
+ 
+⸻
+ 
+Validate DNS Alias Resolution
+nslookup <fsx-alias>
+Expected Result:
+Alias Resolved
+ 
+⸻
+ 
+Validate DNS Reachability
+Important:
+Previous recovery exercises identified DNS reachability issues as a cause of FSx recovery failures.
+Validate:
+Test-NetConnection <DNS-IP> -Port 53
+Expected Result:
+TcpTestSucceeded : True
+ 
+⸻
+ 
+Validate SMB Connectivity
+Test-NetConnection <fsx-name> -Port 445
+Expected Result:
+TcpTestSucceeded : True
+ 
+⸻
+ 
+Validate Share Access
+dir \\fsx-name\share
+Expected Result:
+Contents Returned
+ 
+⸻
+ 
+Validate Authentication
+Confirm:
+	•	Service accounts authenticate
+	•	Access permissions function
+	•	Required shares accessible
+ 
+⸻
+ 
+Validate Access from DR WorkSpace
+Using a DR WorkSpace:
+\\fsx-name\share
+Expected Result:
+Accessible
+ 
+⸻
+ 
+Evidence Required
+Capture:
+	•	FSx status
+	•	DNS alias validation
+	•	Port validation
+	•	Share access validation
+	•	DR WorkSpace validation
+ 
+⸻
+ 
+Common Failures
+DNS Unreachable
+Symptoms:
+FSx Recovery Failure
+Potential Causes:
+	•	Incorrect DNS configuration
+	•	Domain Controller unavailable
+	•	Security Group restrictions
+ 
+⸻
+ 
+SMB Connectivity Failure
+Symptoms:
+Access Denied
+or
+Unable to Connect
+Potential Causes:
+	•	Port 445 blocked
+	•	Security Group restrictions
+	•	Network ACL restrictions
+ 
+⸻
+ 
+Authentication Failure
+Potential Causes:
+	•	Domain Controller unavailable
+	•	Trust relationship failure
+	•	Service account issues
+ 
+⸻
+ 
+Success Criteria
+FSx is considered operational when:
+	•	File System Available
+	•	DNS Alias Resolves
+	•	Port 445 Reachable
+	•	Shares Accessible
+	•	Authentication Successful
+	•	Access Validated from DR WorkSpace
+ 
+⸻
+ 
+Go / No-Go Decision
+Proceed only if FSx validation succeeds.
+If any critical FSx validation fails:
+NO-GO
+Stop application recovery and engage:
+	•	Storage Team
+	•	Active Directory Team
+	•	Infrastructure Team
+as appropriate.
+ 
+⸻
+ 
+Part 2 Summary
+The Disaster Recovery environment is considered ready for database and application recovery only when:
+	•	Domain Controllers validated
+	•	DNS validated
+	•	FSx validated
+Failure of any component requires remediation before proceeding.
+Proceed to:
+Part 3 – Database Recovery Foundations, Application Recovery, Web Recovery, and Network Validation
+ 
+⸻
+ 
+End of Part 2
+
+Enterprise AWS Disaster Recovery Operations Manual
+Part 3 – Database Recovery Foundations, Application Recovery, Web Recovery, and Network Validation
+ 
+⸻
+ 
+18. Database Recovery Foundations
+Objective
+Recover and validate database infrastructure required to support application services within the Disaster Recovery environment.
+Databases frequently represent one of the most critical dependencies within the recovery chain. Application services should not be validated until database recovery has been completed successfully.
+This section focuses on foundational database recovery validation. Detailed SQL Server Always On Availability Group (AOAG) recovery procedures will be covered in a dedicated section later in this document.
+ 
+⸻
+ 
+Background
+Many applications can start successfully even when database connectivity is unavailable.
+This creates a false indication that recovery has succeeded.
+Examples include:
+	•	Login failures
+	•	Missing application data
+	•	Transaction failures
+	•	Report failures
+	•	API failures
+	•	Service initialization failures
+Database validation must therefore be performed before application validation begins.
+ 
+⸻
+ 
+Dependencies
+Before database recovery begins:
+	•	Domain Controllers validated
+	•	DNS validated
+	•	FSx validated
+	•	Required subnets available
+	•	Security groups validated
+ 
+⸻
+ 
+Recovery Methods
+Approved recovery methods may include:
+AWS Elastic Disaster Recovery (DRS)
+Used when database servers are protected through continuous replication.
+AWS Backup
+Used when backup and restore operations are required.
+AMI-Based Recovery
+Used for approved disaster recovery scenarios where AMI restoration is the designated recovery method.
+ 
+⸻
+ 
+Initial Recovery Validation
+Navigate:
+EC2
+→ Instances
+Confirm:
+Instance State = Running
+Validate:
+System Status Check = Passed
+Instance Status Check = Passed
+ 
+⸻
+ 
+Network Validation
+Validate database listener ports.
+Examples:
+Test-NetConnection <db-server> -Port 1433
+Expected:
+TcpTestSucceeded : True
+ 
+⸻
+ 
+DNS Validation
+Validate hostname resolution.
+nslookup <database-server>
+Expected:
+Correct DR IP Returned
+ 
+⸻
+ 
+Service Validation
+Windows:
+Get-Service
+Verify:
+SQL Server Service = Running
+Linux:
+systemctl status <database-service>
+Expected:
+Active (Running)
+ 
+⸻
+ 
+Authentication Validation
+Validate:
+	•	Service accounts
+	•	Database service accounts
+	•	Integrated authentication
+	•	Application connectivity accounts
+ 
+⸻
+ 
+Evidence Required
+Capture:
+	•	Recovery method
+	•	Recovery timestamps
+	•	Instance health checks
+	•	Database service status
+	•	Port validation
+	•	DNS validation
+ 
+⸻
+ 
+Success Criteria
+Database infrastructure is considered operational when:
+	•	Instance running
+	•	Health checks passed
+	•	Database service running
+	•	DNS functional
+	•	Required ports reachable
+ 
+⸻
+ 
+Go / No-Go Decision
+Proceed only if database recovery succeeds.
+If validation fails:
+NO-GO
+Recovery activities stop until database services are restored.
+ 
+⸻
+ 
+19. Application Server Recovery
+Objective
+Recover middleware and application services required to support business applications.
+ 
+⸻
+ 
+Background
+Application servers frequently depend upon:
+	•	Active Directory
+	•	DNS
+	•	FSx
+	•	Databases
+	•	Service Accounts
+Application validation should never begin before validating those dependencies.
+ 
+⸻
+ 
+Dependencies
+Before application recovery:
+	•	Domain Controllers validated
+	•	DNS validated
+	•	FSx validated
+	•	Database infrastructure validated
+ 
+⸻
+ 
+Initial Recovery Validation
+Confirm:
+Instance State = Running
+Validate:
+System Status Check = Passed
+Instance Status Check = Passed
+ 
+⸻
+ 
+Systems Manager Validation
+Navigate:
+Systems Manager
+→ Managed Instances
+Verify:
+Managed = Yes
+Ping Status = Online
+ 
+⸻
+ 
+Service Validation
+Windows:
+Get-Service
+Linux:
+systemctl status <service>
+Verify:
+Running
+ 
+⸻
+ 
+Port Validation
+Example:
+Test-NetConnection localhost -Port <application-port>
+Expected:
+TcpTestSucceeded : True
+ 
+⸻
+ 
+Dependency Validation
+Validate:
+	•	Database connectivity
+	•	FSx connectivity
+	•	Active Directory authentication
+	•	DNS resolution
+ 
+⸻
+ 
+Application Log Validation
+Windows:
+Get-WinEvent -LogName Application
+Linux:
+journalctl -xe
+Review for:
+	•	Startup failures
+	•	Authentication failures
+	•	Missing dependencies
+ 
+⸻
+ 
+Evidence Required
+Capture:
+	•	Service status
+	•	Port validation
+	•	Application logs
+	•	Dependency validation
+ 
+⸻
+ 
+Success Criteria
+Application services start successfully and communicate with required dependencies.
+ 
+⸻
+ 
+Common Failures
+Database Unavailable
+Symptoms:
+	•	Login failures
+	•	Service failures
+	•	Startup failures
+ 
+⸻
+ 
+FSx Unavailable
+Symptoms:
+	•	Missing files
+	•	Configuration failures
+	•	Application startup errors
+ 
+⸻
+ 
+Active Directory Failure
+Symptoms:
+	•	Authentication errors
+	•	Service account failures
+ 
+⸻
+ 
+Go / No-Go Decision
+Proceed only if application services validate successfully.
+ 
+⸻
+ 
+20. Web Server Recovery
+Objective
+Recover and validate presentation tier infrastructure.
+Web servers provide user access to recovered applications.
+ 
+⸻
+ 
+Dependencies
+Before web recovery:
+	•	Database validated
+	•	Application servers validated
+	•	Active Directory validated
+ 
+⸻
+ 
+Recovery Validation
+Confirm:
+Instance Running
+Validate:
+Status Checks Passed
+ 
+⸻
+ 
+Service Validation
+Windows IIS:
+Get-Service W3SVC
+Expected:
+Running
+Linux Apache:
+systemctl status httpd
+Linux NGINX:
+systemctl status nginx
+Expected:
+Active (Running)
+ 
+⸻
+ 
+Local Health Check Validation
+Example:
+Invoke-WebRequest http://localhost/health
+Expected:
+HTTP 200
+ 
+⸻
+ 
+DNS Validation
+nslookup <web-server>
+Expected:
+Correct DR Address Returned
+ 
+⸻
+ 
+Evidence Required
+Capture:
+	•	Service status
+	•	Health check output
+	•	DNS validation
+ 
+⸻
+ 
+Success Criteria
+Web services respond successfully to local health checks.
+ 
+⸻
+ 
+Go / No-Go Decision
+Proceed only if web services validate successfully.
+ 
+⸻
+ 
+21. Network Validation
+Objective
+Validate network connectivity between recovered infrastructure components.
+Many recovery failures are caused by network misconfiguration rather than server failures.
+ 
+⸻
+ 
+Background
+Common network-related issues include:
+	•	Security Group mismatches
+	•	Route Table errors
+	•	CIDR translation issues
+	•	Network ACL restrictions
+	•	DNS failures
+ 
+⸻
+ 
+Dependencies
+Network validation occurs after server recovery and before domain integration validation.
+ 
+⸻
+ 
+Security Group Validation
+Validate Security Groups permit communication between:
+	•	Domain Controllers
+	•	FSx
+	•	Databases
+	•	Application Servers
+	•	Web Servers
+	•	WorkSpaces
+ 
+⸻
+ 
+DR CIDR Translation Validation
+Important:
+Production and Disaster Recovery environments may use different CIDR ranges.
+Validate:
+Production Source
+        ↓
+DR Translation
+        ↓
+Security Group Rule
+Confirm that security group sources reference the correct DR networks.
+ 
+⸻
+ 
+Route Table Validation
+Navigate:
+VPC
+→ Route Tables
+Validate routes for:
+	•	Domain Controllers
+	•	FSx
+	•	Databases
+	•	Application Servers
+	•	WorkSpaces
+ 
+⸻
+ 
+DNS Configuration Validation
+Windows:
+ipconfig /all
+Linux:
+cat /etc/resolv.conf
+Confirm:
+	•	DNS servers correct
+	•	Search suffix correct
+	•	Domain configuration correct
+ 
+⸻
+ 
+Connectivity Validation
+Validate connectivity between recovered servers and dependencies.
+Examples:
+Test-NetConnection <server> -Port 443
+Test-NetConnection <server> -Port 1433
+Test-NetConnection <server> -Port 445
+Expected:
+TcpTestSucceeded : True
+ 
+⸻
+ 
+Evidence Required
+Capture:
+	•	Security Group validation
+	•	Route Table validation
+	•	DNS validation
+	•	Connectivity validation
+ 
+⸻
+ 
+Success Criteria
+Recovered systems communicate successfully across all required network paths.
+ 
+⸻
+ 
+Common Failures
+Security Group Mismatch
+Symptoms:
+Connection Timeout
+Potential Causes:
+	•	Missing rule
+	•	Incorrect source CIDR
+	•	Incorrect security group reference
+ 
+⸻
+ 
+Route Table Failure
+Symptoms:
+Destination Unreachable
+Potential Causes:
+	•	Missing route
+	•	Incorrect subnet association
+ 
+⸻
+ 
+DNS Configuration Failure
+Symptoms:
+Name Resolution Failure
+Potential Causes:
+	•	Incorrect DNS server assignment
+	•	Domain Controller unavailable
+ 
+⸻
+ 
+Go / No-Go Decision
+Proceed only if all required network paths validate successfully.
+If validation fails:
+NO-GO
+Recovery activities stop until network connectivity is restored.
+ 
+⸻
+ 
+Part 3 Summary
+The Disaster Recovery environment is considered ready for domain integration and trust validation when:
+	•	Database services validated
+	•	Application services validated
+	•	Web services validated
+	•	Network connectivity validated
+Proceed to:
+Part 4 – Active Directory Connectivity Validation, Systems Manager Validation, Windows Domain Integration, Linux Domain Integration, and Active Directory Trust Validation
+ 
+⸻
+ 
+End of Part 3
+
+
+Enterprise AWS Disaster Recovery Operations Manual
+Part 4 – Active Directory Connectivity Validation, Systems Manager Validation, Windows Domain Integration, Linux Domain Integration, and Active Directory Trust Validation
+ 
+⸻
+ 
+22. Active Directory Connectivity Validation
+Objective
+Validate communication between recovered infrastructure and the Disaster Recovery Domain Controllers before executing domain integration procedures.
+This phase serves as the final validation checkpoint before Active Directory trust remediation and domain integration activities begin.
+ 
+⸻
+ 
+Background
+Many domain integration failures are incorrectly attributed to:
+	•	Active Directory
+	•	Credentials
+	•	SSM Documents
+In reality, most failures are caused by:
+	•	DNS failures
+	•	Security Group restrictions
+	•	Network ACL restrictions
+	•	Route table issues
+	•	Domain Controller reachability failures
+Connectivity validation isolates infrastructure problems before domain integration begins.
+ 
+⸻
+ 
+Dependencies
+Before beginning this phase:
+	•	Domain Controllers validated
+	•	DNS validated
+	•	FSx validated
+	•	Network validation completed
+	•	Application infrastructure recovered
+ 
+⸻
+ 
+Important Validation Requirement
+All tests within this section must be executed from the recovered server itself.
+Do not execute these tests from:
+	•	Administrator laptops
+	•	Bastion hosts
+	•	Jump servers
+	•	DR WorkSpaces
+The objective is to validate connectivity from the recovered system.
+ 
+⸻
+ 
+Required Active Directory Ports
+Service	Port	Purpose
+DNS	53	Name Resolution
+Kerberos	88	Authentication
+RPC Endpoint Mapper	135	AD Communications
+LDAP	389	Directory Queries
+SMB	445	SYSVOL / NETLOGON
+LDAPS	636	Secure LDAP
+Global Catalog	3268	Forest Queries
+Global Catalog SSL	3269	Secure Forest Queries
+ 
+⸻
+ 
+Windows Validation
+Execute:
+Test-NetConnection <DC-IP> -Port 53
+Test-NetConnection <DC-IP> -Port 88
+Test-NetConnection <DC-IP> -Port 135
+Test-NetConnection <DC-IP> -Port 389
+Test-NetConnection <DC-IP> -Port 445
+Test-NetConnection <DC-IP> -Port 636
+Example:
+Test-NetConnection 10.134.127.232 -Port 53
+Test-NetConnection 10.134.127.232 -Port 389
+Test-NetConnection 10.134.127.232 -Port 445
+Expected:
+TcpTestSucceeded : True
+ 
+⸻
+ 
+Linux Validation
+Execute:
+nc -zv <DC-IP> 53
+nc -zv <DC-IP> 88
+nc -zv <DC-IP> 389
+nc -zv <DC-IP> 445
+Alternative:
+telnet <DC-IP> 53
+telnet <DC-IP> 389
+Expected:
+Connection Successful
+ 
+⸻
+ 
+Validation Interpretation
+If all tests succeed, the following have been validated:
+	•	Network routing
+	•	Security Groups
+	•	Network ACLs
+	•	Firewall paths
+	•	Domain Controller reachability
+Any remaining failures are likely related to:
+	•	Credentials
+	•	DNS configuration
+	•	SSM document execution
+	•	Trust relationships
+ 
+⸻
+ 
+Evidence Required
+Capture:
+	•	Port validation output
+	•	Validation timestamps
+	•	Validation hostnames
+ 
+⸻
+ 
+Success Criteria
+All required Active Directory ports are reachable.
+ 
+⸻
+ 
+Go / No-Go Decision
+Proceed only when:
+	•	DNS reachable
+	•	LDAP reachable
+	•	SMB reachable
+	•	Kerberos reachable
+	•	Domain Controllers reachable
+Otherwise:
+NO-GO
+Recovery activities stop until connectivity is restored.
+ 
+⸻
+ 
+23. Systems Manager Validation
+Objective
+Validate that AWS Systems Manager is capable of managing recovered infrastructure.
+Domain integration activities depend heavily on Systems Manager functionality.
+ 
+⸻
+ 
+Background
+Systems Manager provides:
+	•	Run Command
+	•	Automation
+	•	Fleet Manager
+	•	Remote administration
+Failure of Systems Manager frequently prevents domain integration procedures from executing successfully.
+ 
+⸻
+ 
+Dependencies
+Before validation:
+	•	Network validation complete
+	•	EC2 recovery complete
+ 
+⸻
+ 
+Managed Instance Validation
+Navigate:
+Systems Manager
+→ Fleet Manager
+or
+Systems Manager
+→ Managed Instances
+Verify:
+Managed = Yes
+Ping Status = Online
+ 
+⸻
+ 
+IAM Validation
+Review:
+EC2
+→ Instance
+→ IAM Role
+Verify required permissions.
+ 
+Example:
+AmazonSSMManagedInstanceCore
+ 
+⸻
+ 
+SSM Agent Validation
+Windows:
+Get-Service AmazonSSMAgent
+Expected:
+Running
+Linux:
+systemctl status amazon-ssm-agent
+Expected:
+Active (Running)
+ 
+⸻
+ 
+Run Command Validation
+Execute:
+hostname
+using:
+AWS-RunPowerShellScript
+or
+AWS-RunShellScript
+Expected:
+Command Success
+ 
+⸻
+ 
+Evidence Required
+Capture:
+	•	Managed Instance status
+	•	IAM role validation
+	•	SSM Agent validation
+	•	Run Command results
+ 
+⸻
+ 
+Success Criteria
+Systems Manager successfully executes commands against recovered infrastructure.
+ 
+⸻
+ 
+Go / No-Go Decision
+Proceed only when Systems Manager is fully operational.
+ 
+⸻
+ 
+24. Windows Domain Integration Validation
+Objective
+Validate successful Active Directory integration for recovered Windows servers.
+ 
+⸻
+ 
+Important Clarification
+Recovered Windows servers retain the hostname present at the time of replication.
+Example:
+Production:
+APP01
+
+Recovered DR:
+APP01
+This is expected behavior.
+The objective is not to rename the server.
+The objective is to ensure the server successfully authenticates against the DR Active Directory infrastructure.
+ 
+⸻
+ 
+Approved Domain Integration Documents
+Approved documents include:
+Rename-Windows-computer-psd-domain
+and
+GMS-joinDirectoryServiceDomain
+ 
+⸻
+ 
+Execution Procedure
+Navigate:
+Systems Manager
+→ Run Command
+Select:
+Platform = Windows
+Select recovered servers.
+Execute approved document.
+ 
+⸻
+ 
+Validation
+Review:
+Command Status = Success
+Review:
+	•	Standard Output
+	•	Standard Error
+Confirm no failures occurred.
+ 
+⸻
+ 
+Evidence Required
+Capture:
+	•	Command execution results
+	•	Standard Output
+	•	Standard Error
+	•	Completion timestamps
+ 
+⸻
+ 
+Success Criteria
+Domain integration document completes successfully.
+ 
+⸻
+ 
+Common Failures
+DNS Failure
+Symptoms:
+Domain Not Found
+ 
+⸻
+ 
+Credential Failure
+Symptoms:
+Access Denied
+ 
+⸻
+ 
+Domain Controller Unreachable
+Symptoms:
+Unable to Locate Domain Controller
+ 
+⸻
+ 
+Escalation Path
+	•	Active Directory Team
+	•	Infrastructure Team
+ 
+⸻
+ 
+25. Linux Domain Integration Validation
+Objective
+Validate successful Active Directory integration for Linux infrastructure.
+ 
+⸻
+ 
+Background
+Linux servers utilize approved Systems Manager automation and Secrets Manager credentials to join Active Directory.
+ 
+⸻
+ 
+Dependencies
+Before execution:
+	•	Active Directory connectivity validated
+	•	Systems Manager validated
+	•	Secrets Manager accessible
+ 
+⸻
+ 
+Credential Validation
+Navigate:
+AWS Secrets Manager
+Locate:
+directory-services/DR-AD-ADMIN
+Confirm:
+	•	Secret exists
+	•	Secret accessible
+	•	Credentials current
+ 
+⸻
+ 
+Approved Document
+Execute:
+Redhat-DomainJoinAndConfiguration
+ 
+⸻
+ 
+Execution Procedure
+Navigate:
+Systems Manager
+→ Run Command
+Select:
+Platform = Linux
+Select recovered Linux servers.
+Execute document.
+ 
+⸻
+ 
+Validation
+Confirm:
+Status = Success
+Review:
+	•	Standard Output
+	•	Standard Error
+ 
+⸻
+ 
+Evidence Required
+Capture:
+	•	Command output
+	•	Validation timestamps
+	•	Completion status
+ 
+⸻
+ 
+Success Criteria
+Linux infrastructure successfully integrates with Active Directory.
+ 
+⸻
+ 
+Common Failures
+Secret Retrieval Failure
+Domain Controller Reachability Failure
+DNS Failure
+Authentication Failure
+ 
+⸻
+ 
+Escalation Path
+	•	Active Directory Team
+	•	Linux Team
+	•	Infrastructure Team
+ 
+⸻
+ 
+26. Active Directory Trust Validation
+Objective
+Validate that recovered infrastructure can successfully authenticate against the DR Active Directory environment.
+This represents the authoritative validation phase for Active Directory functionality.
+ 
+⸻
+ 
+Background
+A successful domain integration document does not automatically confirm successful authentication.
+Trust validation confirms:
+	•	Authentication
+	•	DNS
+	•	Domain Controller discovery
+	•	Secure channel functionality
+ 
+⸻
+ 
+Windows Domain Validation
+Execute:
+(Get-WmiObject Win32_ComputerSystem).Domain
+Expected:
+corp.company.com
+ 
+⸻
+ 
+Secure Channel Validation
+Execute:
+Test-ComputerSecureChannel
+Expected:
+True
+ 
+⸻
+ 
+Domain Controller Discovery
+Execute:
+nltest /dsgetdc:corp.company.com
+Expected:
+Domain Controller Found
+ 
+⸻
+ 
+DNS Validation
+Execute:
+nslookup corp.company.com
+nslookup _ldap._tcp.dc._msdcs.corp.company.com
+Expected:
+Successful Resolution
+ 
+⸻
+ 
+Linux Validation
+Execute:
+realm list
+Expected:
+Domain Displayed
+Execute:
+id <domain-user>
+Expected:
+User Information Returned
+ 
+⸻
+ 
+Evidence Required
+Capture:
+	•	Secure channel validation
+	•	Domain membership
+	•	Domain Controller discovery
+	•	DNS validation
+	•	Linux realm validation
+ 
+⸻
+ 
+Success Criteria
+Recovered systems authenticate successfully against the Disaster Recovery Active Directory environment.
+ 
+⸻
+ 
+Final Active Directory Go / No-Go Decision
+Proceed only if:
+	•	Domain integration successful
+	•	Secure channel healthy
+	•	Domain Controllers discoverable
+	•	Authentication successful
+	•	DNS functioning
+If any validation fails:
+NO-GO
+Stop recovery progression until Active Directory functionality is restored.
+ 
+⸻
+ 
+Part 4 Summary
+The Active Directory foundation is considered operational when:
+	•	Connectivity validated
+	•	Systems Manager validated
+	•	Windows integration validated
+	•	Linux integration validated
+	•	Trust relationships validated
+	•	Authentication validated
+Proceed to:
+Part 5 – DR WorkSpace Bubble Validation, Target Group Registration, ALB Validation, NLB Validation, and Route53 Validation
+ 
+⸻
+ 
+End of Part 4
+
+
+Enterprise AWS Disaster Recovery Operations Manual
+Part 5 – DR WorkSpace Bubble Validation, Target Group Registration, ALB Validation, NLB Validation, and Route53 Validation
+ 
+⸻
+ 
+27. DR WorkSpace Bubble Validation
+Objective
+Validate recovered infrastructure from the perspective of an end-user operating within the Disaster Recovery environment.
+This phase validates the “bubble” referenced throughout the Disaster Recovery process.
+The objective is to confirm that recovered infrastructure is accessible from within the DR environment before business validation begins.
+ 
+⸻
+ 
+Background
+Many recovery exercises focus exclusively on infrastructure validation.
+Examples:
+	•	Server recovered
+	•	Service running
+	•	Target healthy
+While technically correct, these validations do not prove that users can access the recovered environment.
+The DR WorkSpace validation phase bridges the gap between infrastructure validation and business validation.
+ 
+⸻
+ 
+Dependencies
+Before beginning this phase:
+	•	Active Directory validated
+	•	DNS validated
+	•	FSx validated
+	•	Applications validated
+	•	Domain integration validated
+ 
+⸻
+ 
+DR Bubble Validation Flow
+WorkSpace Login
+        ↓
+DNS Validation
+        ↓
+Server Reachability
+        ↓
+Administrative Access
+        ↓
+Application Connectivity
+        ↓
+FSx Connectivity
+        ↓
+User Functionality
+ 
+⸻
+ 
+DR WorkSpace Login Validation
+Authenticate into an approved DR WorkSpace.
+Validate:
+	•	User login successful
+	•	Desktop loads successfully
+	•	Domain authentication successful
+Expected:
+Successful Authentication
+ 
+⸻
+ 
+DNS Validation
+Execute:
+nslookup APP01
+nslookup WEB01
+nslookup SQL01
+Expected:
+DR Addresses Returned
+ 
+⸻
+ 
+Administrative Reachability Validation
+Windows Servers
+Test-NetConnection APP01 -Port 3389
+Expected:
+TcpTestSucceeded : True
+ 
+⸻
+ 
+Linux Servers
+Test-NetConnection LINUX01 -Port 22
+Expected:
+TcpTestSucceeded : True
+ 
+⸻
+ 
+Application Connectivity Validation
+Examples:
+Test-NetConnection APP01 -Port 443
+Test-NetConnection APP01 -Port 8443
+Expected:
+TcpTestSucceeded : True
+ 
+⸻
+ 
+FSx Validation from WorkSpace
+Access:
+\\fsx-name\share
+Validate:
+	•	Share accessible
+	•	Permissions correct
+	•	Files visible
+ 
+⸻
+ 
+Evidence Required
+Capture:
+	•	Successful WorkSpace login
+	•	DNS validation
+	•	Port validation
+	•	FSx validation
+ 
+⸻
+ 
+Success Criteria
+Recovered infrastructure is accessible from the DR WorkSpace environment.
+ 
+⸻
+ 
+Go / No-Go Decision
+Proceed only if DR WorkSpace validation succeeds.
+ 
+⸻
+ 
+28. Target Group Registration and Validation
+Objective
+Register recovered infrastructure with DR Target Groups and validate application health.
+ 
+⸻
+ 
+Background
+Recovered instances are not always automatically registered with DR Target Groups.
+A recovered server may be healthy while remaining inaccessible because it is not registered with the correct Target Group.
+ 
+⸻
+ 
+Dependencies
+Before registration:
+	•	Application validated
+	•	Web servers validated
+	•	Domain validation complete
+ 
+⸻
+ 
+Locate Target Groups
+Navigate:
+EC2
+→ Target Groups
+Examples:
+DR-WEB-TG
+DR-APP-TG
+DR-API-TG
+ 
+⸻
+ 
+Register Recovered Targets
+Navigate:
+Target Group
+→ Targets
+→ Register Targets
+Add recovered instances.
+ 
+⸻
+ 
+Validate Target Health
+Review:
+Target Health
+Expected:
+Healthy
+ 
+⸻
+ 
+Health Check Validation
+Review:
+	•	Health Check Path
+	•	Health Check Port
+	•	Health Check Protocol
+Confirm:
+	•	Health check path exists
+	•	Application responds correctly
+ 
+⸻
+ 
+Common Failure – Target Unhealthy
+Symptoms:
+Unhealthy
+ 
+⸻
+ 
+Investigation Procedure
+Validate:
+Application Service
+Windows:
+Get-Service
+Linux:
+systemctl status <service>
+ 
+⸻
+ 
+Health Check Path
+Validate endpoint manually:
+Invoke-WebRequest http://localhost/health
+Expected:
+HTTP 200
+ 
+⸻
+ 
+Security Groups
+Validate:
+	•	Listener access
+	•	Application access
+	•	Health check access
+ 
+⸻
+ 
+Application Logs
+Review:
+	•	Startup failures
+	•	Port binding failures
+	•	Authentication failures
+ 
+⸻
+ 
+Evidence Required
+Capture:
+	•	Registered targets
+	•	Target health
+	•	Health check results
+ 
+⸻
+ 
+Success Criteria
+All required targets report:
+Healthy
+ 
+⸻
+ 
+29. Application Load Balancer (ALB) Validation
+Objective
+Validate HTTP and HTTPS application delivery through the Application Load Balancer.
+ 
+⸻
+ 
+Dependencies
+Before validation:
+	•	Target Groups healthy
+	•	Applications validated
+ 
+⸻
+ 
+Listener Validation
+Navigate:
+EC2
+→ Load Balancers
+→ Listeners
+Verify:
+	•	HTTP listener
+	•	HTTPS listener
+	•	Redirect rules
+ 
+⸻
+ 
+Rule Validation
+Validate:
+	•	Host-based routing
+	•	Path-based routing
+	•	Forwarding rules
+Confirm routing to correct Target Groups.
+ 
+⸻
+ 
+Certificate Validation
+Navigate:
+ACM
+→ Certificates
+Validate:
+Status = Issued
+Confirm:
+	•	Not expired
+	•	Correct domain names
+ 
+⸻
+ 
+End-to-End Validation
+From DR WorkSpace:
+Test-NetConnection app.company.com -Port 443
+Expected:
+TcpTestSucceeded : True
+Open:
+https://app.company.com
+Expected:
+Application Available
+ 
+⸻
+ 
+Common Failures
+Certificate Failure
+Symptoms:
+Certificate Warning
+ 
+⸻
+ 
+Listener Failure
+Symptoms:
+Connection Refused
+ 
+⸻
+ 
+Routing Failure
+Symptoms:
+404
+502
+503
+504
+ 
+⸻
+ 
+Success Criteria
+ALB successfully routes traffic to recovered applications.
+ 
+⸻
+ 
+30. Network Load Balancer (NLB) Validation
+Objective
+Validate non-HTTP application traffic through the Network Load Balancer.
+ 
+⸻
+ 
+Background
+NLB validation differs from ALB validation because many backend services utilize:
+	•	SQL
+	•	Custom protocols
+	•	TLS listeners
+	•	Non-HTTP services
+ 
+⸻
+ 
+Validate NLB Targets
+Confirm:
+Healthy
+ 
+⸻
+ 
+Listener Validation
+Review:
+Listeners
+Validate:
+	•	Protocol
+	•	Port
+	•	TLS configuration
+ 
+⸻
+ 
+Port Validation
+Examples:
+Test-NetConnection SQL01 -Port 1433
+Test-NetConnection APP01 -Port 443
+Expected:
+TcpTestSucceeded : True
+ 
+⸻
+ 
+TLS Validation
+Validate:
+	•	Certificates assigned
+	•	Listener operational
+	•	Back-end communication successful
+ 
+⸻
+ 
+Evidence Required
+Capture:
+	•	Listener configuration
+	•	Target health
+	•	Port validation
+ 
+⸻
+ 
+Success Criteria
+NLB successfully routes traffic to backend services.
+ 
+⸻
+ 
+31. Route53 Validation
+Objective
+Validate DNS behavior for both Disaster Recovery exercises and actual disaster events.
+ 
+⸻
+ 
+Background
+The organization’s Disaster Recovery strategy supports two recovery modes.
+Mode 1 – DR Exercise
+Production remains operational.
+No Route53 cutover occurs.
+ 
+⸻
+ 
+Mode 2 – Actual Disaster
+Production unavailable.
+Manual Route53 updates performed.
+ 
+⸻
+ 
+DR Exercise Validation
+Objective
+Validate DNS without impacting Production.
+Execute:
+nslookup app.company.com
+Expected:
+Successful Resolution
+Validate application access from DR WorkSpaces.
+ 
+⸻
+ 
+Actual Disaster Validation
+Objective
+Redirect production traffic to the Disaster Recovery environment.
+ 
+⸻
+ 
+Route53 Update Procedure
+Navigate:
+Route53
+→ Hosted Zones
+Update:
+	•	Alias Records
+	•	A Records
+	•	CNAME Records
+Point records to:
+DR ALB
+DR NLB
+ 
+⸻
+ 
+Validation
+Execute:
+nslookup app.company.com
+Expected:
+DR Endpoints Returned
+ 
+⸻
+ 
+Browser Validation
+Open:
+https://app.company.com
+Confirm:
+	•	Application available
+	•	Login successful
+	•	Transactions successful
+ 
+⸻
+ 
+Evidence Required
+Capture:
+	•	Route53 records
+	•	DNS resolution
+	•	Browser validation
+ 
+⸻
+ 
+Success Criteria
+DNS routes traffic correctly according to the recovery mode being executed.
+ 
+⸻
+ 
+Part 5 Summary
+The Disaster Recovery environment is considered externally accessible when:
+	•	DR WorkSpace validation completed
+	•	Target Groups healthy
+	•	ALB validated
+	•	NLB validated
+	•	Route53 validated
+Proceed to:
+Part 6 – Application Validation, Business Validation, Evidence Collection, and Recovery Certification
+ 
+⸻
+ 
+End of Part 5
+Enterprise AWS Disaster Recovery Operations Manual
+Part 6 – Application Validation, Business Validation, Evidence Collection, Recovery Certification, and Operational Acceptance
+ 
+⸻
+ 
+32. Application Validation
+Objective
+Validate that recovered applications function correctly within the Disaster Recovery environment and can support business operations.
+Infrastructure recovery alone does not constitute a successful Disaster Recovery exercise.
+Applications must successfully perform their intended functions before recovery can be declared successful.
+ 
+⸻
+ 
+Background
+Applications frequently appear healthy while underlying dependencies remain unavailable.
+Examples include:
+	•	Database unavailable
+	•	FSx unavailable
+	•	Active Directory unavailable
+	•	External API unavailable
+	•	Authentication failures
+Application validation confirms the entire dependency chain is operational.
+ 
+⸻
+ 
+Dependencies
+Before application validation begins:
+	•	Active Directory validated
+	•	DNS validated
+	•	FSx validated
+	•	Database infrastructure validated
+	•	Application servers validated
+	•	Web servers validated
+	•	ALB/NLB validated
+ 
+⸻
+ 
+Application Service Validation
+Validate:
+Windows
+Get-Service
+Confirm:
+Running
+ 
+⸻
+ 
+Linux
+systemctl status <service>
+Expected:
+Active (Running)
+ 
+⸻
+ 
+Port Validation
+Validate all application ports.
+Examples:
+Test-NetConnection localhost -Port 443
+Test-NetConnection localhost -Port 8443
+Expected:
+TcpTestSucceeded : True
+ 
+⸻
+ 
+Authentication Validation
+Validate:
+	•	Active Directory authentication
+	•	Service account authentication
+	•	Application account authentication
+Confirm successful login.
+ 
+⸻
+ 
+Database Connectivity Validation
+Validate application communication with backend databases.
+Confirm:
+	•	Successful connection
+	•	Queries successful
+	•	Transactions successful
+ 
+⸻
+ 
+FSx Dependency Validation
+Validate:
+	•	File share access
+	•	Application configuration access
+	•	Service account permissions
+Example:
+\\fsx-name\share
+Expected:
+Accessible
+ 
+⸻
+ 
+API Validation
+Validate:
+	•	Internal APIs
+	•	External APIs
+	•	Middleware services
+Confirm expected responses.
+ 
+⸻
+ 
+Application Log Review
+Windows:
+Get-WinEvent -LogName Application
+Linux:
+journalctl -xe
+Review:
+	•	Errors
+	•	Warnings
+	•	Authentication failures
+	•	Dependency failures
+ 
+⸻
+ 
+Health Endpoint Validation
+Example:
+https://application-url/health
+Expected:
+HTTP 200
+ 
+⸻
+ 
+Evidence Required
+Capture:
+	•	Service status
+	•	Health endpoint validation
+	•	Authentication validation
+	•	Dependency validation
+	•	Application logs
+ 
+⸻
+ 
+Success Criteria
+Applications function normally within the Disaster Recovery environment.
+ 
+⸻
+ 
+Common Failures
+Database Connectivity Failure
+Symptoms:
+Application Login Failure
+ 
+⸻
+ 
+FSx Dependency Failure
+Symptoms:
+Missing Files
+Configuration Errors
+ 
+⸻
+ 
+Authentication Failure
+Symptoms:
+Access Denied
+ 
+⸻
+ 
+Go / No-Go Decision
+Proceed only if applications function normally.
+ 
+⸻
+ 
+33. Business Validation
+Objective
+Validate business functionality from the user perspective.
+Business validation confirms that recovered applications support normal operational activities.
+ 
+⸻
+ 
+Background
+A technically successful recovery does not guarantee business functionality.
+Business validation verifies:
+	•	User access
+	•	Workflow execution
+	•	Report generation
+	•	Transaction processing
+ 
+⸻
+ 
+Dependencies
+Before business validation:
+	•	Infrastructure validated
+	•	Applications validated
+	•	DR WorkSpace validation completed
+ 
+⸻
+ 
+User Authentication Validation
+From DR WorkSpaces:
+Validate:
+	•	User login
+	•	Active Directory authentication
+	•	Profile loading
+Expected:
+Successful Login
+ 
+⸻
+ 
+Application Access Validation
+Validate:
+	•	Application launches
+	•	Menus accessible
+	•	User permissions correct
+ 
+⸻
+ 
+File Access Validation
+Validate:
+	•	FSx file shares
+	•	User home drives
+	•	Shared resources
+Expected:
+Accessible
+ 
+⸻
+ 
+Report Validation
+Validate:
+	•	Report generation
+	•	Report export
+	•	Report scheduling
+Expected:
+Successful Completion
+ 
+⸻
+ 
+Transaction Validation
+Examples:
+	•	Create record
+	•	Update record
+	•	Search record
+	•	Generate output
+Expected:
+Transaction Successful
+ 
+⸻
+ 
+Workflow Validation
+Validate critical business workflows.
+Examples:
+	•	User onboarding
+	•	Customer lookup
+	•	Reporting
+	•	Data entry
+	•	Approval workflows
+ 
+⸻
+ 
+Evidence Required
+Capture:
+	•	User login validation
+	•	Application validation
+	•	Workflow validation
+	•	Report validation
+	•	Transaction validation
+ 
+⸻
+ 
+Success Criteria
+Business users successfully perform normal operational activities.
+ 
+⸻
+ 
+Business Acceptance Decision
+Business stakeholders determine:
+Accepted
+or
+Rejected
+ 
+⸻
+ 
+34. Recovery Evidence Collection
+Objective
+Collect evidence demonstrating successful Disaster Recovery execution.
+Evidence supports:
+	•	Audit requirements
+	•	Compliance requirements
+	•	Recovery certification
+	•	Lessons learned reviews
+ 
+⸻
+ 
+Evidence Repository Structure
+Example:
+DR-Exercise
+│
+├── 01-Readiness
+├── 02-DomainControllers
+├── 03-DNS
+├── 04-FSx
+├── 05-Databases
+├── 06-Applications
+├── 07-Web
+├── 08-DomainIntegration
+├── 09-LoadBalancers
+├── 10-WorkSpaces
+├── 11-BusinessValidation
+└── 12-Signoff
+ 
+⸻
+ 
+Required Evidence Categories
+Recovery Evidence
+Capture:
+	•	Recovery method
+	•	Recovery start time
+	•	Recovery end time
+ 
+⸻
+ 
+Active Directory Evidence
+Capture:
+Test-ComputerSecureChannel
+nltest /dsgetdc:corp.company.com
+ 
+⸻
+ 
+FSx Evidence
+Capture:
+Share Access Validation
+ 
+⸻
+ 
+Target Group Evidence
+Capture:
+Healthy Targets
+ 
+⸻
+ 
+Load Balancer Evidence
+Capture:
+	•	ALB validation
+	•	NLB validation
+	•	Certificate validation
+ 
+⸻
+ 
+Application Evidence
+Capture:
+	•	Application access
+	•	Health checks
+	•	Transactions
+ 
+⸻
+ 
+WorkSpace Evidence
+Capture:
+	•	Login validation
+	•	Connectivity validation
+ 
+⸻
+ 
+Business Validation Evidence
+Capture:
+	•	Reports
+	•	Transactions
+	•	Workflow validation
+ 
+⸻
+ 
+Evidence Retention
+Store all evidence within the approved DR repository.
+Retain according to organizational policy.
+ 
+⸻
+ 
+35. Recovery Certification
+Objective
+Determine whether the Disaster Recovery exercise successfully met recovery objectives.
+ 
+⸻
+ 
+Technical Certification Criteria
+All items must pass:
+	•	Domain Controllers
+	•	DNS
+	•	FSx
+	•	Databases
+	•	Applications
+	•	Target Groups
+	•	ALB
+	•	NLB
+	•	Active Directory Validation
+	•	WorkSpace Validation
+ 
+⸻
+ 
+Business Certification Criteria
+Business users must successfully:
+	•	Authenticate
+	•	Access applications
+	•	Access files
+	•	Execute workflows
+	•	Generate reports
+	•	Complete transactions
+ 
+⸻
+ 
+Recovery Status Options
+PASS
+All technical and business validations successful.
+ 
+⸻
+ 
+PASS WITH OBSERVATIONS
+Recovery successful but issues identified.
+Remediation required.
+ 
+⸻
+ 
+FAIL
+Recovery objectives not achieved.
+Further remediation required.
+ 
+⸻
+ 
+36. Operational Acceptance
+Objective
+Obtain formal approval from technical and business stakeholders.
+ 
+⸻
+ 
+Required Approvals
+Role	Approval Required
+DR Lead	Yes
+Infrastructure Lead	Yes
+Active Directory Lead	Yes
+Storage Lead	Yes
+Database Lead	Yes
+Application Lead	Yes
+Business Owner	Yes
+ 
+⸻
+ 
+Sign-Off Record
+Name	Role	Date	Signature
+			
+			
+			
+ 
+⸻
+ 
+Final Exercise Outcome
+Select One:
+PASS
+PASS WITH OBSERVATIONS
+FAIL
+ 
+⸻
+ 
+Part 6 Summary
+The Disaster Recovery exercise is considered complete only when:
+	•	Technical validation completed
+	•	Business validation completed
+	•	Evidence collected
+	•	Recovery certified
+	•	Sign-offs obtained
+Proceed to:
+Part 7 – Failure Handling, Troubleshooting Playbooks, Escalation Procedures, and Lessons Learned
+ 
+⸻
+ 
+End of Part 6
+
+Enterprise AWS Disaster Recovery Operations Manual
+Part 7 – Failure Handling, Troubleshooting Playbooks, Escalation Procedures, Acceptance Management, and Lessons Learned
+ 
+⸻
+ 
+37. Failure Handling Framework
+Objective
+Provide a structured methodology for handling failures encountered during Disaster Recovery exercises and actual disaster events.
+This framework ensures failures are:
+	•	Identified consistently
+	•	Escalated appropriately
+	•	Remediated efficiently
+	•	Documented completely
+ 
+⸻
+ 
+Background
+A common mistake during Disaster Recovery exercises is attempting to continue recovery activities despite unresolved foundational issues.
+Examples:
+	•	Continuing application recovery while DNS is broken
+	•	Continuing domain integration while Domain Controllers are unavailable
+	•	Continuing user testing while FSx is inaccessible
+This frequently causes:
+	•	False failures
+	•	Extended recovery times
+	•	Misleading exercise results
+The objective of this framework is to isolate issues before they impact additional recovery phases.
+ 
+⸻
+ 
+Failure Response Workflow
+Failure Detected
+       ↓
+Capture Evidence
+       ↓
+Classify Severity
+       ↓
+Assign Owner
+       ↓
+Escalate
+       ↓
+Remediate
+       ↓
+Revalidate
+       ↓
+Resume Recovery
+ 
+⸻
+ 
+Failure Documentation Requirements
+Every failure must document:
+	•	Timestamp
+	•	Affected Component
+	•	Symptoms
+	•	Root Cause
+	•	Resolution
+	•	Recovery Impact
+ 
+⸻
+ 
+38. Failure Severity Classification
+Critical Failure
+Definition
+Failure prevents continuation of recovery activities.
+ 
+⸻
+ 
+Examples
+	•	Domain Controllers unavailable
+	•	DNS unavailable
+	•	FSx unavailable
+	•	Database unavailable
+	•	Systems Manager unavailable
+	•	Route53 failure during actual disaster
+ 
+⸻
+ 
+Impact
+Recovery Stops Immediately
+ 
+⸻
+ 
+Escalation Priority
+Priority 1
+ 
+⸻
+ 
+Major Failure
+Definition
+Recovery may continue with restrictions.
+ 
+⸻
+ 
+Examples
+	•	Single application unavailable
+	•	Single Target Group unhealthy
+	•	One web server unavailable
+	•	Single database replica unavailable
+ 
+⸻
+ 
+Impact
+Recovery Delayed
+ 
+⸻
+ 
+Escalation Priority
+Priority 2
+ 
+⸻
+ 
+Minor Failure
+Definition
+Issue does not significantly impact recovery.
+ 
+⸻
+ 
+Examples
+	•	Documentation errors
+	•	Cosmetic application issues
+	•	Reporting issues
+ 
+⸻
+ 
+Impact
+Recovery Continues
+ 
+⸻
+ 
+Escalation Priority
+Priority 3
+ 
+⸻
+ 
+39. Active Directory Failure Playbook
+Symptoms
+Examples:
+Domain Not Found
+No Logon Servers Available
+Unable to Locate Domain Controller
+ 
+⸻
+ 
+Validation Steps
+Domain Controller Discovery
+nltest /dclist:corp.company.com
+Expected:
+Domain Controllers Returned
+ 
+⸻
+ 
+Domain Controller Locator
+nltest /dsgetdc:corp.company.com
+Expected:
+Domain Controller Found
+ 
+⸻
+ 
+DNS Validation
+nslookup corp.company.com
+Expected:
+Successful Resolution
+ 
+⸻
+ 
+Port Validation
+Test-NetConnection <DC-IP> -Port 53
+Test-NetConnection <DC-IP> -Port 88
+Test-NetConnection <DC-IP> -Port 389
+Test-NetConnection <DC-IP> -Port 445
+Expected:
+TcpTestSucceeded : True
+ 
+⸻
+ 
+Common Root Causes
+	•	DNS failure
+	•	Security Group restrictions
+	•	Route table issues
+	•	Domain Controller unavailable
+	•	AD replication failure
+ 
+⸻
+ 
+Escalation
+Engage:
+	•	Active Directory Team
+	•	Infrastructure Team
+ 
+⸻
+ 
+40. DNS Failure Playbook
+Symptoms
+Name Resolution Failure
+Unknown Host
+Domain Not Found
+ 
+⸻
+ 
+Validation Steps
+DNS Resolution
+nslookup corp.company.com
+ 
+⸻
+ 
+SRV Record Validation
+nslookup _ldap._tcp.dc._msdcs.corp.company.com
+ 
+⸻
+ 
+DNS Connectivity
+Test-NetConnection <DNS-IP> -Port 53
+ 
+⸻
+ 
+Common Root Causes
+	•	DNS service outage
+	•	Incorrect DNS assignment
+	•	Security Group restrictions
+	•	Domain Controller outage
+ 
+⸻
+ 
+Escalation
+	•	Active Directory Team
+	•	Infrastructure Team
+ 
+⸻
+ 
+41. FSx Failure Playbook
+Symptoms
+Access Denied
+Path Not Found
+Unable To Connect
+ 
+⸻
+ 
+Validation Steps
+DNS Alias Validation
+nslookup <fsx-alias>
+ 
+⸻
+ 
+DNS Reachability
+Test-NetConnection <DNS-IP> -Port 53
+ 
+⸻
+ 
+SMB Validation
+Test-NetConnection <fsx-name> -Port 445
+ 
+⸻
+ 
+Share Validation
+dir \\fsx-name\share
+ 
+⸻
+ 
+Common Root Causes
+	•	DNS failure
+	•	Domain Controller unavailable
+	•	Port 445 blocked
+	•	Security Group issues
+	•	Authentication failure
+ 
+⸻
+ 
+Escalation
+	•	Storage Team
+	•	Active Directory Team
+	•	Infrastructure Team
+ 
+⸻
+ 
+42. Systems Manager Failure Playbook
+Symptoms
+Managed = No
+Ping Status = Offline
+Command Failed
+ 
+⸻
+ 
+Validation Steps
+IAM Validation
+Verify:
+AmazonSSMManagedInstanceCore
+attached.
+ 
+⸻
+ 
+Agent Validation
+Windows:
+Get-Service AmazonSSMAgent
+Linux:
+systemctl status amazon-ssm-agent
+ 
+⸻
+ 
+Network Validation
+Confirm connectivity to:
+	•	Systems Manager
+	•	EC2 Messages
+	•	SSM Messages
+ 
+⸻
+ 
+Common Root Causes
+	•	Missing IAM role
+	•	Agent stopped
+	•	Network restrictions
+	•	Endpoint issues
+ 
+⸻
+ 
+Escalation
+	•	Infrastructure Team
+	•	Cloud Operations Team
+ 
+⸻
+ 
+43. Database Failure Playbook
+Symptoms
+Database Connection Failed
+Login Failed
+Timeout Expired
+ 
+⸻
+ 
+Validation Steps
+DNS Validation
+nslookup <database-server>
+ 
+⸻
+ 
+Port Validation
+Test-NetConnection <database-server> -Port 1433
+ 
+⸻
+ 
+Service Validation
+Windows:
+Get-Service
+Confirm SQL services running.
+ 
+⸻
+ 
+Authentication Validation
+Confirm:
+	•	Service account authentication
+	•	Database login functionality
+ 
+⸻
+ 
+Common Root Causes
+	•	SQL service stopped
+	•	Port blocked
+	•	DNS failure
+	•	Authentication issues
+ 
+⸻
+ 
+Escalation
+	•	Database Team
+ 
+⸻
+ 
+44. Target Group Failure Playbook
+Symptoms
+Unhealthy
+ 
+⸻
+ 
+Validation Steps
+Service Validation
+Windows:
+Get-Service
+Linux:
+systemctl status <service>
+ 
+⸻
+ 
+Health Check Validation
+Invoke-WebRequest http://localhost/health
+Expected:
+HTTP 200
+ 
+⸻
+ 
+Security Group Validation
+Validate:
+	•	Listener traffic
+	•	Health check traffic
+	•	Application traffic
+ 
+⸻
+ 
+Application Log Review
+Review:
+	•	Startup failures
+	•	Port binding failures
+	•	Authentication failures
+ 
+⸻
+ 
+Common Root Causes
+	•	Service stopped
+	•	Health endpoint failure
+	•	Security Group restrictions
+	•	Application failure
+ 
+⸻
+ 
+Escalation
+	•	Application Team
+	•	Infrastructure Team
+ 
+⸻
+ 
+45. Load Balancer Failure Playbook
+ALB Failures
+Symptoms
+502
+503
+504
+ 
+⸻
+ 
+Investigation
+Validate:
+	•	Target health
+	•	Listener rules
+	•	Certificates
+	•	Application availability
+ 
+⸻
+ 
+NLB Failures
+Symptoms
+Connection Timeout
+ 
+⸻
+ 
+Investigation
+Validate:
+Test-NetConnection <server> -Port <port>
+ 
+⸻
+ 
+Escalation
+	•	Infrastructure Team
+	•	Application Team
+ 
+⸻
+ 
+46. Route53 Failure Playbook
+Symptoms
+Incorrect Endpoint Returned
+Name Resolution Failure
+ 
+⸻
+ 
+Validation Steps
+nslookup app.company.com
+ 
+⸻
+ 
+Verify
+	•	Alias records
+	•	A records
+	•	CNAME records
+ 
+⸻
+ 
+Common Root Causes
+	•	Incorrect DNS update
+	•	Wrong ALB target
+	•	Wrong NLB target
+ 
+⸻
+ 
+Escalation
+	•	Infrastructure Team
+	•	DNS Team
+ 
+⸻
+ 
+47. Application Failure Playbook
+Symptoms
+Application Unavailable
+Authentication Failure
+Transaction Failure
+ 
+⸻
+ 
+Validation Steps
+Service Validation
+Validate services running.
+ 
+⸻
+ 
+Dependency Validation
+Validate:
+	•	Active Directory
+	•	DNS
+	•	Database
+	•	FSx
+ 
+⸻
+ 
+Log Review
+Windows:
+Get-WinEvent -LogName Application
+Linux:
+journalctl -xe
+ 
+⸻
+ 
+Common Root Causes
+	•	Dependency unavailable
+	•	Service failure
+	•	Configuration issues
+ 
+⸻
+ 
+Escalation
+	•	Application Team
+ 
+⸻
+ 
+48. Escalation Matrix
+Component	Primary Team	Secondary Team
+Active Directory	AD Team	Infrastructure
+DNS	AD Team	Infrastructure
+FSx	Storage Team	AD Team
+Systems Manager	Infrastructure	Cloud Operations
+Databases	Database Team	Infrastructure
+Applications	Application Team	Infrastructure
+Target Groups	Infrastructure	Application Team
+ALB	Infrastructure	Application Team
+NLB	Infrastructure	Application Team
+Route53	Infrastructure	DNS Team
+ 
+⸻
+ 
+49. Recovery Acceptance Review
+Objective
+Determine whether recovery objectives were successfully achieved.
+ 
+⸻
+ 
+Technical Acceptance Criteria
+All validations must pass:
+	•	Domain Controllers
+	•	DNS
+	•	FSx
+	•	Databases
+	•	Applications
+	•	Target Groups
+	•	ALB
+	•	NLB
+	•	Route53
+	•	WorkSpaces
+ 
+⸻
+ 
+Business Acceptance Criteria
+Business users successfully:
+	•	Login
+	•	Access applications
+	•	Access files
+	•	Generate reports
+	•	Execute workflows
+	•	Complete transactions
+ 
+⸻
+ 
+Recovery Outcome Categories
+PASS
+All recovery objectives achieved.
+ 
+⸻
+ 
+PASS WITH OBSERVATIONS
+Recovery successful.
+Issues identified requiring remediation.
+ 
+⸻
+ 
+FAIL
+Recovery objectives not achieved.
+Further recovery actions required.
+ 
+⸻
+ 
+50. Lessons Learned Review
+Objective
+Capture findings that improve future Disaster Recovery exercises.
+ 
+⸻
+ 
+Review Questions
+What Worked Well?
+Document:
+	•	Successful recovery procedures
+	•	Effective automation
+	•	Effective communications
+ 
+⸻
+ 
+What Failed?
+Document:
+	•	Recovery delays
+	•	Infrastructure issues
+	•	Operational issues
+ 
+⸻
+ 
+What Should Be Improved?
+Document:
+	•	Automation improvements
+	•	Documentation updates
+	•	Infrastructure enhancements
+	•	Monitoring improvements
+ 
+⸻
+ 
+Remediation Tracking Register
+Issue	Owner	Priority	Due Date	Status
+				
+ 
+⸻
+ 
+Runbook Maintenance Requirements
+Any lesson learned that impacts recovery operations must be incorporated into the next version of this runbook.
+ 
+⸻
+ 
+Part 7 Summary
+At this stage:
+	•	Recovery completed
+	•	Validation completed
+	•	Business testing completed
+	•	Evidence collected
+	•	Recovery certified
+	•	Lessons learned documented
+The Disaster Recovery exercise is now considered operationally complete.
+Proceed to:
+Part 8 – SQL Server Recovery, AOAG Validation, Database Failover Procedures, and Environment-Specific Technical Appendices
+ 
+⸻
+ 
+End of Part 7
+Enterprise AWS Disaster Recovery Operations Manual
+Part 8 – SQL Server Recovery, AOAG Validation, Database Failover Procedures, and Environment-Specific Technical Appendices
+ 
+⸻
+ 
+51. SQL Server Disaster Recovery Overview
+Objective
+Provide a structured process for recovering, validating, and certifying SQL Server infrastructure within the Disaster Recovery environment.
+This section focuses on:
+	•	SQL Server recovery
+	•	SQL service validation
+	•	Database validation
+	•	Always On Availability Group (AOAG) validation
+	•	Application dependency validation
+	•	Recovery certification
+ 
+⸻
+ 
+Background
+For most enterprise applications, SQL Server represents the most critical dependency after Active Directory and storage.
+Applications may appear operational while underlying database services remain unavailable.
+Examples include:
+	•	User login failures
+	•	Report generation failures
+	•	Transaction failures
+	•	Data retrieval failures
+	•	Application startup failures
+Database validation must therefore occur before application certification.
+ 
+⸻
+ 
+52. SQL Recovery Architecture
+Production Architecture
+Example:
+Primary SQL Server
+        ↓
+AOAG Listener
+        ↓
+Application Servers
+ 
+⸻
+ 
+DR Architecture
+Example:
+Recovered SQL Server(s)
+        ↓
+AOAG Listener
+        ↓
+Recovered Application Servers
+ 
+⸻
+ 
+Recovery Dependency Chain
+Domain Controllers
+        ↓
+DNS
+        ↓
+FSx
+        ↓
+SQL Servers
+        ↓
+AOAG
+        ↓
+Applications
+        ↓
+Web Tier
+Failure anywhere above SQL recovery invalidates SQL validation results.
+ 
+⸻
+ 
+53. SQL Server Recovery Validation
+Objective
+Validate successful recovery of SQL infrastructure before application validation begins.
+ 
+⸻
+ 
+Instance Validation
+Navigate:
+EC2
+→ Instances
+Confirm:
+State = Running
+Validate:
+System Status Check = Passed
+Instance Status Check = Passed
+ 
+⸻
+ 
+Systems Manager Validation
+Confirm:
+Managed = Yes
+Ping Status = Online
+ 
+⸻
+ 
+DNS Validation
+Execute:
+nslookup SQL01
+Expected:
+Correct DR Address Returned
+ 
+⸻
+ 
+Port Validation
+Default SQL Port:
+Test-NetConnection SQL01 -Port 1433
+Expected:
+TcpTestSucceeded : True
+ 
+⸻
+ 
+SQL Service Validation
+Execute:
+Get-Service *SQL*
+Validate:
+Running
+Examples:
+SQL Server
+SQL Agent
+SQL Browser
+ 
+⸻
+ 
+Evidence Required
+Capture:
+	•	Instance health
+	•	SQL service status
+	•	Port validation
+	•	DNS validation
+ 
+⸻
+ 
+Success Criteria
+SQL infrastructure operational.
+ 
+⸻
+ 
+54. Database Validation
+Objective
+Validate database availability following recovery.
+ 
+⸻
+ 
+Database Accessibility Validation
+Connect using:
+	•	SQL Server Management Studio
+	•	Azure Data Studio
+	•	Approved database tools
+ 
+⸻
+ 
+Validate Database State
+Execute:
+SELECT
+name,
+state_desc
+FROM sys.databases;
+Expected:
+ONLINE
+ 
+⸻
+ 
+Validate Database Accessibility
+Execute:
+SELECT GETDATE();
+Expected:
+Current Timestamp Returned
+ 
+⸻
+ 
+Validate Read Operations
+Execute application-specific validation queries.
+Expected:
+Data Returned Successfully
+ 
+⸻
+ 
+Validate Write Operations
+Create approved test record.
+Validate:
+	•	Insert
+	•	Update
+	•	Delete
+Expected:
+Transaction Successful
+ 
+⸻
+ 
+Evidence Required
+Capture:
+	•	Database status
+	•	Query results
+	•	Transaction validation
+ 
+⸻
+ 
+Success Criteria
+Databases operational and accessible.
+ 
+⸻
+ 
+55. AOAG Overview
+Objective
+Validate Always On Availability Group functionality within DR.
+ 
+⸻
+ 
+Background
+Always On Availability Groups provide:
+	•	High Availability
+	•	Database Replication
+	•	Automatic Failover
+	•	Read-Only Replicas
+DR validation must confirm the AG is healthy before applications are certified.
+ 
+⸻
+ 
+AOAG Components
+Typical Components:
+Primary Replica
+Secondary Replica
+Availability Group
+Availability Group Listener
+ 
+⸻
+ 
+56. AOAG Health Validation
+Validate Availability Groups
+Execute:
+SELECT
+name
+FROM sys.availability_groups;
+Expected:
+Availability Group Returned
+ 
+⸻
+ 
+Validate Replica Health
+Execute:
+SELECT
+replica_server_name,
+role_desc
+FROM sys.dm_hadr_availability_replica_states ars
+JOIN sys.availability_replicas ar
+ON ars.replica_id = ar.replica_id;
+Expected:
+PRIMARY
+SECONDARY
+ 
+⸻
+ 
+Validate Synchronization State
+Execute:
+SELECT
+database_id,
+synchronization_state_desc
+FROM sys.dm_hadr_database_replica_states;
+Expected:
+SYNCHRONIZED
+or
+SYNCHRONIZING
+depending on recovery stage.
+ 
+⸻
+ 
+Evidence Required
+Capture:
+	•	AG configuration
+	•	Replica state
+	•	Synchronization state
+ 
+⸻
+ 
+57. AOAG Listener Validation
+Objective
+Validate listener accessibility.
+Applications commonly connect through the listener rather than directly to SQL instances.
+ 
+⸻
+ 
+DNS Validation
+Execute:
+nslookup <AOAG-LISTENER>
+Expected:
+Listener Address Returned
+ 
+⸻
+ 
+Port Validation
+Execute:
+Test-NetConnection <AOAG-LISTENER> -Port 1433
+Expected:
+TcpTestSucceeded : True
+ 
+⸻
+ 
+Connection Validation
+Connect using:
+AOAG Listener
+Expected:
+Successful SQL Connection
+ 
+⸻
+ 
+Success Criteria
+Applications can reach SQL through the listener.
+ 
+⸻
+ 
+58. Application-to-Database Validation
+Objective
+Validate application communication with SQL infrastructure.
+ 
+⸻
+ 
+Authentication Validation
+Confirm:
+	•	Service accounts authenticate
+	•	Application accounts authenticate
+ 
+⸻
+ 
+Connectivity Validation
+Review:
+	•	Connection strings
+	•	Listener configuration
+	•	DNS resolution
+ 
+⸻
+ 
+Transaction Validation
+Execute:
+	•	User login
+	•	Data lookup
+	•	Data update
+	•	Report generation
+Expected:
+Successful Transaction
+ 
+⸻
+ 
+Common Failures
+Listener Failure
+Symptoms:
+Unable To Connect
+ 
+⸻
+ 
+DNS Failure
+Symptoms:
+Server Not Found
+ 
+⸻
+ 
+Synchronization Failure
+Symptoms:
+Database Not Accessible
+ 
+⸻
+ 
+59. SQL Recovery Certification
+Objective
+Determine whether SQL infrastructure is ready for application certification.
+ 
+⸻
+ 
+Validation Checklist
+SQL Infrastructure
+	•	SQL Server running
+	•	SQL Agent running
+	•	SQL reachable
+ 
+⸻
+ 
+Databases
+	•	Online
+	•	Readable
+	•	Writable
+ 
+⸻
+ 
+AOAG
+	•	Availability Group healthy
+	•	Replicas healthy
+	•	Synchronization healthy
+ 
+⸻
+ 
+Listener
+	•	DNS resolves
+	•	Port reachable
+	•	Connections successful
+ 
+⸻
+ 
+Applications
+	•	Connectivity successful
+	•	Transactions successful
+ 
+⸻
+ 
+Go / No-Go Decision
+Proceed only if:
+All SQL Validation Successful
+Otherwise:
+NO-GO
+Recovery certification cannot continue.
+ 
+⸻
+ 
+60. SQL Failure Playbook
+SQL Service Failure
+Symptoms
+SQL Service Stopped
+ 
+⸻
+ 
+Validation
+Get-Service *SQL*
+ 
+⸻
+ 
+Escalation
+	•	Database Team
+ 
+⸻
+ 
+Listener Failure
+Symptoms
+Unable To Connect
+ 
+⸻
+ 
+Validation
+nslookup <AOAG-LISTENER>
+Test-NetConnection <AOAG-LISTENER> -Port 1433
+ 
+⸻
+ 
+Escalation
+	•	Database Team
+	•	Infrastructure Team
+ 
+⸻
+ 
+Synchronization Failure
+Symptoms
+NOT SYNCHRONIZED
+ 
+⸻
+ 
+Validation
+SELECT synchronization_state_desc
+FROM sys.dm_hadr_database_replica_states;
+ 
+⸻
+ 
+Escalation
+	•	Database Team
+ 
+⸻
+ 
+61. Environment-Specific Appendices
+Appendix A – Domain Controllers
+Document:
+	•	Domain Controller Names
+	•	IP Addresses
+	•	Sites
+	•	Replication Topology
+ 
+⸻
+ 
+Appendix B – FSx
+Document:
+	•	FSx Names
+	•	DNS Aliases
+	•	Shares
+	•	Service Accounts
+ 
+⸻
+ 
+Appendix C – Load Balancers
+Document:
+	•	ALBs
+	•	NLBs
+	•	Target Groups
+	•	Listener Ports
+ 
+⸻
+ 
+Appendix D – Route53
+Document:
+	•	Hosted Zones
+	•	Alias Records
+	•	Cutover Procedures
+ 
+⸻
+ 
+Appendix E – Systems Manager
+Document:
+Windows
+Rename-Windows-computer-psd-domain
+GMS-joinDirectoryServiceDomain
+Linux
+Redhat-DomainJoinAndConfiguration
+ 
+⸻
+ 
+Appendix F – Contacts
+Team	Contact
+DR Lead	
+Infrastructure	
+AD Team	
+Storage Team	
+Database Team	
+Application Team	
+ 
+⸻
+ 
+Final Recovery Certification
+A Disaster Recovery exercise is considered successful only when:
+	•	Infrastructure validated
+	•	Active Directory validated
+	•	DNS validated
+	•	FSx validated
+	•	SQL validated
+	•	AOAG validated
+	•	Applications validated
+	•	Load Balancers validated
+	•	Route53 validated
+	•	Business validation completed
+	•	Sign-offs obtained
+ 
+⸻
+ 
+End of Enterprise AWS Disaster Recovery Operations Manual
+Version 1.0
+
+
+# Enterprise AWS Disaster Recovery Operations Manual
+
+# Part 9 – AWS DRS Recovery Procedures, FSx Restore Operations, and Security Group Validation Matrix
+
+---
+
+# 62. AWS Elastic Disaster Recovery (DRS) Recovery Operations
+
+## Objective
+
+Recover protected Production servers into the Disaster Recovery environment using AWS Elastic Disaster Recovery (DRS).
+
+This section provides the operational procedures for launching recovered instances and validating successful recovery.
+
+---
+
+## Background
+
+AWS DRS continuously replicates Production workloads into a staging area.
+
+During a recovery event:
+
+- Recovery instances are launched
+- Volumes are recreated
+- Network mappings applied
+- Security Groups assigned
+- Workloads brought online
+
+Recovery success does not automatically imply application readiness.
+
+Post-recovery validation is required.
+
+---
+
+# Recovery Workflow
+
+```text
+Production Server
+        ↓
+Continuous Replication
+        ↓
+AWS DRS
+        ↓
+Launch Recovery Instance
+        ↓
+Recover into DR
+        ↓
+Validate Infrastructure
+        ↓
+Validate Applications
+```
+
+---
+
+## Recovery Procedure
+
+Navigate:
+
+AWS Elastic Disaster Recovery
+
+→ Source Servers
+
+Select:
+
+Protected Server
+
+Choose:
+
+Launch Recovery Instance
+
+---
+
+## Launch Configuration Validation
+
+Review:
+
+- Instance Type
+- Security Groups
+- Subnets
+- IAM Roles
+- Volumes
+
+Confirm DR configuration is correct.
+
+---
+
+## Launch Recovery
+
+Select:
+
+Launch Recovery Instance
+
+Monitor:
+
+Recovery Job
+
+Expected:
+
+```text
+Recovery Completed
+```
+
+---
+
+## EC2 Validation
+
+Navigate:
+
+EC2
+
+→ Instances
+
+Validate:
+
+```text
+Instance State = Running
+
+System Status Check = Passed
+
+Instance Status Check = Passed
+```
+
+---
+
+## Systems Manager Validation
+
+Confirm:
+
+```text
+Managed = Yes
+
+Ping Status = Online
+```
+
+---
+
+## Recovery Evidence
+
+Capture:
+
+- Recovery Job ID
+- Recovery Start Time
+- Recovery End Time
+- Recovery Instance ID
+
+---
+
+## Success Criteria
+
+Recovery instance operational and available for validation.
+
+---
+
+# 63. AWS DRS Failback Considerations
+
+## Objective
+
+Document considerations for returning workloads back to Production.
+
+---
+
+## Validate
+
+Before failback:
+
+- Production infrastructure restored
+- Data synchronized
+- Applications validated
+- Business approval obtained
+
+---
+
+## Failback Risks
+
+Examples:
+
+- Data divergence
+- DNS inconsistency
+- Application version mismatch
+
+---
+
+## Recommendation
+
+Failback procedures must be separately tested and documented.
+
+---
+
+# 64. FSx Restore Operations
+
+## Objective
+
+Recover FSx for Windows File Server into the Disaster Recovery environment.
+
+---
+
+## Background
+
+FSx recovery depends heavily upon:
+
+- Active Directory
+- DNS
+- Network Connectivity
+
+Many failed FSx restores are caused by DNS reachability issues rather than FSx itself.
+
+---
+
+## Dependencies
+
+Before restore:
+
+- Domain Controllers operational
+- DNS operational
+- Security Groups validated
+
+---
+
+## Pre-Restore DNS Validation
+
+Validate from the target subnet.
+
+```powershell
+Test-NetConnection <DNS-IP> -Port 53
+```
+
+Expected:
+
+```text
+TcpTestSucceeded : True
+```
+
+---
+
+## Why This Matters
+
+Previous DR exercises identified:
+
+```text
+FSx Restore Failed
+DNS Unreachable
+```
+
+even when:
+
+```text
+EC2 Connectivity Successful
+```
+
+Therefore DNS validation is mandatory.
+
+---
+
+## Restore Procedure
+
+Navigate:
+
+AWS Backup
+
+→ Protected Resources
+
+Select:
+
+FSx Resource
+
+Choose:
+
+Restore
+
+---
+
+## Configuration Validation
+
+Review:
+
+- VPC
+- Subnet
+- Security Groups
+- DNS IP Addresses
+- Active Directory Configuration
+
+---
+
+## Execute Restore
+
+Monitor:
+
+Restore Job
+
+Expected:
+
+```text
+Completed
+```
+
+---
+
+## Post-Restore Validation
+
+Validate:
+
+### DNS Alias
+
+```powershell
+nslookup <fsx-alias>
+```
+
+---
+
+### SMB Connectivity
+
+```powershell
+Test-NetConnection <fsx-name> -Port 445
+```
+
+---
+
+### Share Validation
+
+```powershell
+dir \\fsx-name\share
+```
+
+---
+
+## Success Criteria
+
+FSx available and accessible.
+
+---
+
+# 65. Security Group Validation Framework
+
+## Objective
+
+Validate security group rules after recovery.
+
+---
+
+## Background
+
+One of the most common DR failures occurs when Production CIDRs differ from DR CIDRs.
+
+Examples:
+
+```text
+Production:
+10.131.x.x
+
+DR:
+10.134.x.x
+```
+
+Security Groups copied directly from Production may not function correctly.
+
+---
+
+# Validation Process
+
+```text
+Production Rule
+        ↓
+CIDR Translation
+        ↓
+DR Rule
+        ↓
+Connectivity Test
+```
+
+---
+
+## Validation Areas
+
+Review:
+
+### Ingress Rules
+
+Validate:
+
+- Source CIDRs
+- Source Security Groups
+- Port Requirements
+
+---
+
+### Egress Rules
+
+Validate:
+
+- Destination CIDRs
+- Required Application Paths
+
+---
+
+## Common Validation Ports
+
+### Active Directory
+
+| Port | Purpose |
+|--------|--------|
+| 53 | DNS |
+| 88 | Kerberos |
+| 389 | LDAP |
+| 445 | SMB |
+
+---
+
+### SQL
+
+| Port | Purpose |
+|--------|--------|
+| 1433 | SQL Server |
+
+---
+
+### Web
+
+| Port | Purpose |
+|--------|--------|
+| 80 | HTTP |
+| 443 | HTTPS |
+
+---
+
+# Security Group Validation Examples
+
+## Active Directory
+
+```powershell
+Test-NetConnection <DC-IP> -Port 53
+Test-NetConnection <DC-IP> -Port 389
+Test-NetConnection <DC-IP> -Port 445
+```
+
+---
+
+## SQL
+
+```powershell
+Test-NetConnection <SQL-IP> -Port 1433
+```
+
+---
+
+## HTTPS
+
+```powershell
+Test-NetConnection <APP-IP> -Port 443
+```
+
+---
+
+## Expected Result
+
+```text
+TcpTestSucceeded : True
+```
+
+---
+
+# Security Group Troubleshooting
+
+## Symptoms
+
+```text
+Connection Timeout
+```
+
+---
+
+## Common Causes
+
+- Incorrect DR CIDR
+- Incorrect Source Security Group
+- Missing Rule
+- Incorrect Route
+
+---
+
+## Investigation Workflow
+
+```text
+Application Failure
+        ↓
+Port Test
+        ↓
+Security Group Review
+        ↓
+Route Table Review
+        ↓
+Connectivity Retest
+```
+
+---
+
+# 66. DR Network Validation Matrix
+
+| Component | Validation |
+|------------|------------|
+| Domain Controller | Port 53, 88, 389, 445 |
+| FSx | Port 445 |
+| SQL | Port 1433 |
+| Web | Port 80, 443 |
+| ALB | Health Checks |
+| NLB | Listener Ports |
+| Route53 | DNS Resolution |
+
+---
+
+# Part 9 Summary
+
+Environment-specific recovery procedures now include:
+
+- AWS DRS Recovery Operations
+- DRS Failback Considerations
+- FSx Restore Procedures
+- DNS Validation Requirements
+- Security Group Validation Framework
+- DR CIDR Translation Guidance
+- Network Validation Matrix
+
+These procedures are based on lessons learned from actual Disaster Recovery exercises and troubleshooting activities.
+
+# Enterprise AWS Disaster Recovery Operations Manual
+
+# Part 10 – Environment Configuration Appendix
+
+---
+
+# 67. Purpose
+
+This appendix contains environment-specific configuration information used during Disaster Recovery exercises and actual disaster events.
+
+Unlike the operational procedures documented throughout this runbook, the information contained within this appendix is expected to change over time.
+
+This appendix should be reviewed and updated prior to every Disaster Recovery exercise.
+
+---
+
+# 68. AWS Environment Inventory
+
+## Production Environment
+
+| Item | Value |
+|---------|---------|
+| AWS Account Name | |
+| AWS Account ID | |
+| Region | |
+| VPC ID | |
+| CIDR | |
+
+---
+
+## Disaster Recovery Environment
+
+| Item | Value |
+|---------|---------|
+| AWS Account Name | |
+| AWS Account ID | |
+| Region | |
+| VPC ID | |
+| CIDR | |
+
+---
+
+# 69. Active Directory Inventory
+
+## Domain Information
+
+| Item | Value |
+|---------|---------|
+| Domain Name | corp.company.com |
+| Forest Name | |
+| NetBIOS Name | |
+| Domain Functional Level | |
+| Forest Functional Level | |
+
+---
+
+## Domain Controllers
+
+| Server Name | IP Address | Site | Role |
+|-------------|------------|------|------|
+| | | | |
+| | | | |
+| | | | |
+
+---
+
+## DNS Servers
+
+| DNS Server | IP Address |
+|------------|------------|
+| | |
+| | |
+| | |
+
+---
+
+## Active Directory Validation Commands
+
+```powershell
+nltest /dclist:corp.company.com
+```
+
+```powershell
+nltest /dsgetdc:corp.company.com
+```
+
+```powershell
+Test-ComputerSecureChannel
+```
+
+---
+
+# 70. Systems Manager Inventory
+
+## SSM Documents
+
+### Windows
+
+| Document Name | Purpose |
+|---------------|---------|
+| Rename-Windows-computer-psd-domain | Domain Integration |
+| GMS-joinDirectoryServiceDomain | Domain Integration |
+| AWS-RunPowerShellScript | Validation |
+
+---
+
+### Linux
+
+| Document Name | Purpose |
+|---------------|---------|
+| Redhat-DomainJoinAndConfiguration | Domain Join |
+| AWS-RunShellScript | Validation |
+
+---
+
+## Secrets Manager
+
+| Secret Name | Purpose |
+|------------|---------|
+| directory-services/DR-AD-ADMIN | Linux Domain Join |
+
+---
+
+# 71. FSx Inventory
+
+## FSx File Systems
+
+| FSx Name | DNS Alias | Environment |
+|------------|------------|------------|
+| | | |
+| | | |
+
+---
+
+## SMB Shares
+
+| Share | Purpose |
+|---------|---------|
+| | |
+| | |
+| | |
+
+---
+
+## Validation Commands
+
+```powershell
+nslookup <fsx-alias>
+```
+
+```powershell
+Test-NetConnection <fsx-name> -Port 445
+```
+
+```powershell
+dir \\fsx-name\share
+```
+
+---
+
+# 72. SQL Server Inventory
+
+## SQL Servers
+
+| Server Name | Role | Environment |
+|-------------|------|-------------|
+| | | |
+| | | |
+
+---
+
+## AOAG Information
+
+| Item | Value |
+|---------|---------|
+| Availability Group | |
+| Listener Name | |
+| Listener Port | 1433 |
+
+---
+
+## Validation Commands
+
+```powershell
+Test-NetConnection <AOAG-LISTENER> -Port 1433
+```
+
+---
+
+# 73. Application Inventory
+
+## Application Servers
+
+| Server Name | Application | Environment |
+|-------------|-------------|-------------|
+| | | |
+| | | |
+
+---
+
+## Web Servers
+
+| Server Name | Function |
+|-------------|-------------|
+| | |
+| | |
+
+---
+
+## Health Check URLs
+
+| Application | Health Check |
+|-------------|-------------|
+| | |
+| | |
+
+---
+
+# 74. Load Balancer Inventory
+
+## Application Load Balancers
+
+| Name | DNS Name |
+|---------|---------|
+| | |
+| | |
+
+---
+
+## Network Load Balancers
+
+| Name | DNS Name |
+|---------|---------|
+| | |
+| | |
+
+---
+
+## Target Groups
+
+| Target Group | Purpose |
+|-------------|-------------|
+| | |
+| | |
+| | |
+
+---
+
+# 75. Route53 Inventory
+
+## Hosted Zones
+
+| Zone Name |
+|-----------|
+| |
+| |
+
+---
+
+## Critical DNS Records
+
+| Record | Purpose |
+|---------|---------|
+| | |
+| | |
+| | |
+
+---
+
+## Disaster Cutover Records
+
+| Record | DR Endpoint |
+|---------|---------|
+| | |
+| | |
+| | |
+
+---
+
+# 76. Security Group Mapping Matrix
+
+## Production to DR Mapping
+
+| Production SG | DR SG |
+|---------------|------|
+| | |
+| | |
+| | |
+
+---
+
+## CIDR Translation Matrix
+
+| Production CIDR | DR CIDR |
+|----------------|----------|
+| | |
+| | |
+| | |
+
+---
+
+# 77. Disaster Recovery WorkSpaces
+
+## DR WorkSpaces
+
+| User | WorkSpace ID |
+|---------|---------|
+| | |
+| | |
+
+---
+
+## Validation Commands
+
+```powershell
+nslookup APP01
+```
+
+```powershell
+Test-NetConnection APP01 -Port 3389
+```
+
+```powershell
+Test-NetConnection LINUX01 -Port 22
+```
+
+---
+
+# 78. Recovery Contacts
+
+## Disaster Recovery Team
+
+| Team | Primary Contact | Backup Contact |
+|---------|---------|---------|
+| DR Lead | | |
+| Infrastructure | | |
+| Active Directory | | |
+| Storage | | |
+| Database | | |
+| Applications | | |
+| Networking | | |
+
+---
+
+# 79. Escalation Matrix
+
+## Severity 1
+
+Examples:
+
+- Active Directory Failure
+- DNS Failure
+- FSx Failure
+- SQL Failure
+
+Response:
+
+```text
+Immediate Escalation
+```
+
+---
+
+## Severity 2
+
+Examples:
+
+- Application Failure
+- Target Group Failure
+
+Response:
+
+```text
+Escalate Within 30 Minutes
+```
+
+---
+
+## Severity 3
+
+Examples:
+
+- Documentation Issues
+- Cosmetic Issues
+
+Response:
+
+```text
+Track and Remediate
+```
+
+---
+
+# 80. Runbook Revision History
+
+| Version | Date | Author | Changes |
+|----------|----------|----------|----------|
+| 1.0 | | | Initial Release |
+| | | | |
+| | | | |
+
+---
+
+# End of Appendix
+
+This appendix should be updated before every Disaster Recovery exercise and whenever infrastructure changes occur.
+
+
+# Enterprise AWS Disaster Recovery Operations Manual
+
+# Part 11 – Disaster Recovery Exercise Execution Guide
+
+---
+
+# 81. Purpose
+
+This section provides the operational workflow used to execute a Disaster Recovery exercise from start to finish.
+
+While previous sections describe how individual systems are validated, this section describes how the recovery event itself is managed.
+
+---
+
+# 82. Recovery Command Structure
+
+## DR Lead
+
+Responsible for:
+
+- Managing the exercise
+- Coordinating teams
+- Authorizing progression
+- Recording decisions
+
+Only the DR Lead may authorize progression between recovery phases.
+
+---
+
+## Infrastructure Team
+
+Responsible for:
+
+- EC2 recovery
+- Networking
+- Load Balancers
+- Systems Manager
+
+---
+
+## Active Directory Team
+
+Responsible for:
+
+- Domain Controllers
+- DNS
+- Authentication
+
+---
+
+## Storage Team
+
+Responsible for:
+
+- FSx
+- SMB Validation
+
+---
+
+## Database Team
+
+Responsible for:
+
+- SQL Recovery
+- AOAG Validation
+
+---
+
+## Application Team
+
+Responsible for:
+
+- Application Validation
+- Middleware Validation
+
+---
+
+## Business Validation Team
+
+Responsible for:
+
+- User Acceptance Testing
+- Workflow Validation
+
+---
+
+# 83. DR Exercise Timeline
+
+## T-7 Days
+
+### Preparation Meeting
+
+Review:
+
+- Scope
+- Participants
+- Recovery objectives
+- Risks
+- Success criteria
+
+---
+
+### Runbook Review
+
+Confirm latest version available.
+
+Review:
+
+- Recovery procedures
+- Escalation contacts
+- Dependencies
+
+---
+
+### Access Validation
+
+Confirm:
+
+- AWS access
+- SSM access
+- Database access
+- WorkSpace access
+
+---
+
+# 84. T-1 Day
+
+## Environment Validation
+
+Confirm:
+
+- Domain Controllers available
+- FSx available
+- Route53 reviewed
+- ALB/NLB reviewed
+
+---
+
+## Freeze Changes
+
+Avoid:
+
+- Infrastructure modifications
+- Application deployments
+- Security Group changes
+
+---
+
+# 85. Recovery Day
+
+## Exercise Start
+
+Record:
+
+```text
+Exercise Start Time
+```
+
+---
+
+## Recovery Declaration
+
+DR Lead announces:
+
+```text
+Recovery Activities Authorized
+```
+
+---
+
+# Phase Gate 1
+
+## DR Readiness Validation
+
+Execute:
+
+- AD validation
+- DNS validation
+- SSM validation
+
+Decision:
+
+```text
+GO
+```
+
+or
+
+```text
+NO-GO
+```
+
+---
+
+# Phase Gate 2
+
+## Infrastructure Recovery
+
+Recover:
+
+- Domain Controllers
+- FSx
+- SQL
+- Applications
+- Web
+
+Validate each phase.
+
+---
+
+# Phase Gate 3
+
+## Domain Validation
+
+Execute:
+
+```powershell
+Test-ComputerSecureChannel
+```
+
+```powershell
+nltest /dsgetdc:corp.company.com
+```
+
+Decision:
+
+```text
+GO
+```
+
+or
+
+```text
+NO-GO
+```
+
+---
+
+# Phase Gate 4
+
+## Application Validation
+
+Validate:
+
+- Services
+- Databases
+- APIs
+- Health Checks
+
+---
+
+# Phase Gate 5
+
+## DR WorkSpace Validation
+
+Validate:
+
+- Login
+- DNS
+- Connectivity
+- Applications
+
+---
+
+# Phase Gate 6
+
+## Business Validation
+
+Validate:
+
+- User workflows
+- Reporting
+- Transactions
+
+---
+
+# 86. Recovery Time Tracking
+
+Track:
+
+| Milestone | Start | End |
+|------------|------------|------------|
+| DR Start | | |
+| AD Ready | | |
+| FSx Ready | | |
+| SQL Ready | | |
+| Applications Ready | | |
+| Business Validation Complete | | |
+
+---
+
+## Recovery Time Objective Validation
+
+Compare actual recovery time against:
+
+```text
+RTO Targets
+```
+
+Document deviations.
+
+---
+
+# 87. Recovery Point Objective Validation
+
+Validate:
+
+- Database currency
+- File currency
+- Application currency
+
+Compare against:
+
+```text
+RPO Targets
+```
+
+---
+
+# 88. Exercise Completion
+
+DR Lead confirms:
+
+- Technical Validation Complete
+- Business Validation Complete
+- Evidence Collected
+
+---
+
+# 89. Formal Sign-Off Meeting
+
+Review:
+
+- Successes
+- Failures
+- Risks
+- Lessons Learned
+
+---
+
+# 90. Exercise Closure
+
+Record:
+
+```text
+Exercise End Time
+```
+
+Calculate:
+
+```text
+Total Recovery Duration
+```
+
+---
+
+# 91. Post-Exercise Review
+
+Within five business days:
+
+Conduct:
+
+```text
+Lessons Learned Review
+```
+
+Document:
+
+- Improvements
+- Risks
+- Action Items
+
+Update runbook accordingly.
+
+---
+
+# End of Part 11
+
+
+# Enterprise AWS Disaster Recovery Operations Manual
+
+# Part 12 – Disaster Recovery Execution Worksheets
+
+---
+
+# 92. DR Exercise Information Sheet
+
+## Exercise Information
+
+| Item | Value |
+|--------|--------|
+| Exercise Name | |
+| Exercise Date | |
+| DR Lead | |
+| Start Time | |
+| End Time | |
+| Production Region | |
+| DR Region | |
+| Production Account | |
+| DR Account | |
+
+---
+
+## Recovery Scope
+
+| Component | Included |
+|------------|------------|
+| Domain Controllers | Yes / No |
+| DNS | Yes / No |
+| FSx | Yes / No |
+| SQL | Yes / No |
+| AOAG | Yes / No |
+| Applications | Yes / No |
+| Web Tier | Yes / No |
+| ALB | Yes / No |
+| NLB | Yes / No |
+| Route53 | Yes / No |
+
+---
+
+# 93. Recovery Timeline Worksheet
+
+| Milestone | Start Time | End Time | Status |
+|------------|------------|------------|------------|
+| DR Declared | | | |
+| AD Validation | | | |
+| DNS Validation | | | |
+| FSx Validation | | | |
+| SQL Validation | | | |
+| Application Validation | | | |
+| Web Validation | | | |
+| Business Validation | | | |
+| Exercise Complete | | | |
+
+---
+
+# 94. Domain Controller Validation Worksheet
+
+| Validation Item | Result | Notes |
+|-----------------|---------|---------|
+| Domain Controllers Online | Pass / Fail | |
+| nltest /dclist | Pass / Fail | |
+| nltest /dsgetdc | Pass / Fail | |
+| DNS Resolution | Pass / Fail | |
+| LDAP Connectivity | Pass / Fail | |
+| Kerberos Connectivity | Pass / Fail | |
+| SMB Connectivity | Pass / Fail | |
+
+---
+
+## Validation Evidence
+
+Location:
+
+```text
+________________________________
+```
+
+---
+
+# 95. DNS Validation Worksheet
+
+| Validation | Result | Notes |
+|------------|---------|---------|
+| Domain Resolution | Pass / Fail | |
+| SRV Records | Pass / Fail | |
+| Reverse Lookup | Pass / Fail | |
+| Port 53 Reachable | Pass / Fail | |
+
+---
+
+# 96. FSx Validation Worksheet
+
+| Validation | Result | Notes |
+|------------|---------|---------|
+| FSx Available | Pass / Fail | |
+| DNS Alias Resolves | Pass / Fail | |
+| Port 445 Reachable | Pass / Fail | |
+| Share Accessible | Pass / Fail | |
+| Authentication Successful | Pass / Fail | |
+
+---
+
+## Share Validation
+
+| Share | Accessible | Notes |
+|---------|---------|---------|
+| | Yes / No | |
+| | Yes / No | |
+| | Yes / No | |
+
+---
+
+# 97. SQL Validation Worksheet
+
+| Validation | Result | Notes |
+|------------|---------|---------|
+| SQL Running | Pass / Fail | |
+| Port 1433 Reachable | Pass / Fail | |
+| Databases Online | Pass / Fail | |
+| Listener Reachable | Pass / Fail | |
+| Authentication Successful | Pass / Fail | |
+
+---
+
+# 98. AOAG Validation Worksheet
+
+| Validation | Result | Notes |
+|------------|---------|---------|
+| AG Exists | Pass / Fail | |
+| Replica Healthy | Pass / Fail | |
+| Synchronization Healthy | Pass / Fail | |
+| Listener Operational | Pass / Fail | |
+
+---
+
+# 99. Application Validation Worksheet
+
+| Application | Result | Notes |
+|------------|---------|---------|
+| | Pass / Fail | |
+| | Pass / Fail | |
+| | Pass / Fail | |
+
+---
+
+## Application Health Checks
+
+| URL | Result |
+|------|---------|
+| | Pass / Fail |
+| | Pass / Fail |
+| | Pass / Fail |
+
+---
+
+# 100. Target Group Validation Worksheet
+
+| Target Group | Healthy | Notes |
+|-------------|----------|---------|
+| | Yes / No | |
+| | Yes / No | |
+| | Yes / No | |
+
+---
+
+# 101. Load Balancer Validation Worksheet
+
+## ALB
+
+| Validation | Result |
+|------------|---------|
+| Listener Validated | Pass / Fail |
+| Certificates Valid | Pass / Fail |
+| Routing Valid | Pass / Fail |
+
+---
+
+## NLB
+
+| Validation | Result |
+|------------|---------|
+| Listener Validated | Pass / Fail |
+| Target Healthy | Pass / Fail |
+| Port Reachable | Pass / Fail |
+
+---
+
+# 102. DR WorkSpace Validation Worksheet
+
+| Validation | Result |
+|------------|---------|
+| Login Successful | Pass / Fail |
+| DNS Resolution | Pass / Fail |
+| RDP Connectivity | Pass / Fail |
+| SSH Connectivity | Pass / Fail |
+| HTTPS Connectivity | Pass / Fail |
+| FSx Connectivity | Pass / Fail |
+
+---
+
+# 103. Business Validation Worksheet
+
+| Workflow | Tester | Result |
+|-----------|-----------|-----------|
+| User Login | | Pass / Fail |
+| File Access | | Pass / Fail |
+| Report Generation | | Pass / Fail |
+| Transaction Processing | | Pass / Fail |
+| Search Functions | | Pass / Fail |
+
+---
+
+## Additional Workflows
+
+| Workflow | Tester | Result |
+|-----------|-----------|-----------|
+| | | |
+| | | |
+| | | |
+
+---
+
+# 104. Issue Tracking Worksheet
+
+| Issue ID | Severity | Description | Owner | Status |
+|------------|------------|------------|------------|------------|
+| | | | | |
+| | | | | |
+| | | | | |
+
+---
+
+# 105. Recovery Metrics Worksheet
+
+## Recovery Time Objective (RTO)
+
+| Component | Target | Actual |
+|------------|------------|------------|
+| AD | | |
+| FSx | | |
+| SQL | | |
+| Applications | | |
+| Full Recovery | | |
+
+---
+
+## Recovery Point Objective (RPO)
+
+| Component | Target | Actual |
+|------------|------------|------------|
+| FSx | | |
+| SQL | | |
+| Applications | | |
+
+---
+
+# 106. Recovery Certification Worksheet
+
+## Technical Validation
+
+| Area | Result |
+|--------|--------|
+| Active Directory | Pass / Fail |
+| DNS | Pass / Fail |
+| FSx | Pass / Fail |
+| SQL | Pass / Fail |
+| AOAG | Pass / Fail |
+| Applications | Pass / Fail |
+| Load Balancers | Pass / Fail |
+| WorkSpaces | Pass / Fail |
+
+---
+
+## Business Validation
+
+| Area | Result |
+|--------|--------|
+| User Authentication | Pass / Fail |
+| File Access | Pass / Fail |
+| Reporting | Pass / Fail |
+| Transactions | Pass / Fail |
+| Workflow Execution | Pass / Fail |
+
+---
+
+# 107. Final Exercise Sign-Off
+
+## Technical Teams
+
+| Team | Name | Signature |
+|---------|---------|---------|
+| Infrastructure | | |
+| Active Directory | | |
+| Storage | | |
+| Database | | |
+| Application | | |
+
+---
+
+## Business Teams
+
+| Team | Name | Signature |
+|---------|---------|---------|
+| Business Owner | | |
+| DR Coordinator | | |
+| Executive Sponsor | | |
+
+---
+
+# Final Outcome
+
+Select One:
+
+```text
+PASS
+```
+
+```text
+PASS WITH OBSERVATIONS
+```
+
+```text
+FAIL
+```
+
+---
+
+# 108. Post-Exercise Action Register
+
+| Action Item | Owner | Due Date | Status |
+|------------|---------|---------|---------|
+| | | | |
+| | | | |
+| | | | |
+
+---
+
+# End of Part 12
+
+These worksheets become the official evidence package generated during each DR exercise.
+
+Part 1  - Introduction & Readiness
+Part 2  - Domain Controllers, DNS, FSx
+Part 3  - Databases, Applications, Network
+Part 4  - AD Integration & Trust Validation
+Part 5  - WorkSpaces, ALB, NLB, Route53
+Part 6  - Application & Business Validation
+Part 7  - Troubleshooting & Lessons Learned
+Part 8  - SQL & AOAG Operations
+Part 9  - DRS, FSx Restore, SG Validation
+Part 10 - Environment Configuration Appendix
+Part 11 - DR Exercise Execution Guide
+Part 12 - Recovery Worksheets & Evidence Package
+
+This is now closer to a complete DR operations program than a typical runbook. The remaining additions would be highly environment-specific (actual server names, AOAG names, DNS servers, subnets, account IDs, target groups, and recovery scripts).
